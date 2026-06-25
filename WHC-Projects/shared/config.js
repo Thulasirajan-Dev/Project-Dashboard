@@ -17,7 +17,7 @@ const FIREBASE_URLS = {
 
   // ── New test database ─────────────────────────────────────
   // After creating your new Firebase project, paste its URL below
-  test: "https://whc-projects-test-default-rtdb.firebaseio.com/"
+  test: "https://whc-project-6e1b8-default-rtdb.firebaseio.com/"
 };
 
 // Active Firebase URL — used by shared.js automatically
