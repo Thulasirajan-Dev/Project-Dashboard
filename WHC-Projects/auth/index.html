@@ -166,13 +166,10 @@ async function submitLogin() {
   }
 }
 
-// Make ROLE_MODULE_URL available here
-const ROLE_MODULE_URL = {
-  super_admin: "/auth/",
-  proposals:   "/proposals/",
-  coordinator: "/coordinator/",
-};
-
+// NOTE: ROLE_MODULE_URL is already declared in auth.js (loaded above).
+// Re-declaring it here with `const` throws "already been declared",
+// which kills this entire <script> block — including boot() — and
+// leaves the page stuck on the loading spinner.
 boot();
 </script>
 </body>
