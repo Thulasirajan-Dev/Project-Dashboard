@@ -5,10 +5,14 @@
   publish = "."
 
 # ── Root landing page ─────────────────────────────────────────
+# Use a real redirect (301) so the browser's URL becomes /auth/.
+# A status=200 rewrite would serve auth's HTML AT the root path,
+# and its relative <script src="auth.js"> would then resolve to
+# /auth.js (root) → 404 + MIME error. The 301 fixes the base URL.
 [[redirects]]
   from = "/"
-  to   = "/auth/index.html"
-  status = 200
+  to   = "/auth/"
+  status = 301
 
 # ── Module routes (bare path → that module's index.html) ──────
 # NOTE: Do NOT add "/module/*" → "/module/:splat" rewrites.
