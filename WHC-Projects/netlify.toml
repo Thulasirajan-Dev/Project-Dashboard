@@ -4,20 +4,21 @@
 [build]
   publish = "."
 
-# ── Module routes ─────────────────────────────────────────────
+# ── Root landing page ─────────────────────────────────────────
 [[redirects]]
   from = "/"
   to   = "/auth/index.html"
   status = 200
 
+# ── Module routes (bare path → that module's index.html) ──────
+# NOTE: Do NOT add "/module/*" → "/module/:splat" rewrites.
+# Netlify already serves static files (JS/CSS/images) inside each
+# folder directly. A wildcard self-rewrite shadows those real files
+# and makes them return HTML (404 page) instead of the asset,
+# which breaks <script src> with a MIME-type error.
 [[redirects]]
   from = "/auth"
   to   = "/auth/index.html"
-  status = 200
-
-[[redirects]]
-  from = "/auth/*"
-  to   = "/auth/:splat"
   status = 200
 
 [[redirects]]
@@ -26,18 +27,8 @@
   status = 200
 
 [[redirects]]
-  from = "/proposals/*"
-  to   = "/proposals/:splat"
-  status = 200
-
-[[redirects]]
   from = "/coordinator"
   to   = "/coordinator/index.html"
-  status = 200
-
-[[redirects]]
-  from = "/coordinator/*"
-  to   = "/coordinator/:splat"
   status = 200
 
 [[redirects]]
@@ -46,28 +37,13 @@
   status = 200
 
 [[redirects]]
-  from = "/account/*"
-  to   = "/account/:splat"
-  status = 200
-
-[[redirects]]
   from = "/summary"
   to   = "/summary/index.html"
   status = 200
 
 [[redirects]]
-  from = "/summary/*"
-  to   = "/summary/:splat"
-  status = 200
-
-[[redirects]]
   from = "/client"
   to   = "/client/index.html"
-  status = 200
-
-[[redirects]]
-  from = "/client/*"
-  to   = "/client/:splat"
   status = 200
 
 # ── Security headers ──────────────────────────────────────────
