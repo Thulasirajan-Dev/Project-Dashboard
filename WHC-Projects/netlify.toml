@@ -6,6 +6,11 @@
 
 # ── Module routes ─────────────────────────────────────────────
 [[redirects]]
+  from = "/"
+  to   = "/auth/index.html"
+  status = 200
+
+[[redirects]]
   from = "/auth"
   to   = "/auth/index.html"
   status = 200
