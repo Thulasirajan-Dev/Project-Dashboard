@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>WHC – Coordinator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap"/>
+<link rel="stylesheet" href="../shared/style.css"/>
+<button class="scroll-top-btn" id="scrollTopBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+</head>
+<body>
+<div id="app"><div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">Loading...</div></div></div>
+<script src="../shared/config.js"></script>
+<script src="../shared/shared.js"></script>
+<script src="coordinator.js"></script>
+<script>
+let ALL_PROJECTS = {}, PROJ = null, CURRENT_USER = null;
+let S = {
+  mode:"coord", tab:"list",
+  coordName:"", coordSearch:"", coordFilterStatus:"all", coordFilterProjType:"all",
+  coordFilterStage:"all", coordFilterReapp:"all", coordFilterQuot:"",
+  saving:false, saved:false, modal:null, selectedStages:[], bulkStatus:""
+};
+
+async function boot() {
+  CURRENT_USER = requireRole("coordinator","super_admin");
+  if (!CURRENT_USER) return;
+  S.coordName = CURRENT_USER.name || "";
+  document.getElementById("app").innerHTML = `<div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">Loading your projects...</div></div>`;
+  ALL_PROJECTS = (await fbGet("projects")) || {};
+  S.mode = "coord"; S.tab = "list"; render();
+}
+
+function render() {
+  const root = document.getElementById("app");
+  const overlay = renderModals();
+  if (S.mode === "client") { root.innerHTML = renderClientView() + overlay; return; }
+  if (S.tab === "list" || !PROJ) { root.innerHTML = renderCoordList() + overlay; }
+  else { root.innerHTML = renderCoordEditor() + overlay; }
+}
+
+function renderNameStep() {
+  return `<div style="background:linear-gradient(135deg,#0d2137,#1a3a5c);padding:28px 20px;color:#fff;text-align:center">
+    <div style="font-size:9px;letter-spacing:2px;color:#c9a752;text-transform:uppercase;font-weight:600;margin-bottom:8px">Winner Holistic Consultants</div>
+    <div style="font-size:18px;font-weight:700;margin-bottom:4px">Welcome, Coordinator</div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.5)">Enter your name to see your assigned projects</div>
+  </div>
+  <div class="login-wrap" style="padding-top:28px"><div class="coord-name-box">
+    <div style="font-size:13px;color:#888;margin-bottom:18px">Your name filters projects assigned to you.</div>
+    <div class="fl">Your Name <span class="req-star">*</span></div>
+    <input class="fi" id="coord-name-input" placeholder="e.g. Ahmed Al Rashidi" style="margin-bottom:14px"
+      onkeydown="if(event.key==='Enter')submitCoordName()"/>
+    <button class="btn btn-gold" style="width:100%;padding:11px;font-size:13px" onclick="submitCoordName()">Continue →</button>
+  </div></div>`;
+}
+
+function renderClientView() {
+  const d = PROJ; if (!d) return "";
+  const fb = natureArr(d.project.unitType).includes("F&B");
+  const stages = d.stages || [];
+  const doneCount = stages.filter(s => isStageComplete(s)).length;
+  const pct = Math.round(doneCount / Math.max(stages.length, 1) * 100);
+  const currentStage = stages.find(s => { const sv=s.status||""; return sv&&!["received","approved","completed","completed-signed","approved-bcc"].includes(sv); });
+  const allDone = doneCount === stages.length && stages.length > 0;
+  let h = `<div class="hdr">
+    <div class="hdr-logo">Winner Holistic Consultants</div>
+    <div class="hdr-title">${esc(d.project.title||"Project")}</div>
+    <div class="hdr-sub">${esc(d.project.location||"")}</div>
+    <div class="pills">
+      <div class="pill">Client: ${esc(d.project.client||"—")}</div>
+      <div class="pill">Unit: ${esc(d.project.unit||"—")}</div>
+      <div class="pill">Coordinator: ${esc(d.project.coordinator||"—")}</div>
+    </div>
+    <div class="pbar-row"><span>Overall Progress</span><span>${pct}% Complete</span></div>
+    <div class="pbar-bg"><div class="pbar-fill" style="width:${pct}%"></div></div>
+  </div>
+  <div class="topbar">
+    <span style="font-size:12px;color:#888">${doneCount} of ${stages.length} stages completed</span>
+    <button class="btn btn-sm btn-gold" onclick="S.mode='coord';S.tab='stages';render()">← Back to Edit</button>
+  </div>
+  <div class="tabs">
+    <div class="tab ${S.tab==="stages"?"on":""}" onclick="S.tab='stages';render()">Approval Stages</div>
+    <div class="tab ${S.tab==="docs"?"on":""}"   onclick="S.tab='docs';render()">Documents</div>
+  </div><div class="body">`;
+  if (S.tab === "stages") {
+    h += `<div class="milestone-label" ${allDone?'style="border-color:#a3d4b8;background:#f0fdf4"':''}>
+      <div class="milestone-icon">${allDone?"🎉":currentStage?"📍":"🕐"}</div>
+      <div class="milestone-text">
+        <div class="milestone-title">Current Milestone</div>
+        <div class="milestone-value">${allDone?"Project Fully Completed ✓":currentStage?esc(currentStage.name):"Awaiting First Stage Update"}</div>
+        ${currentStage&&currentStage.note?`<div class="milestone-note">${esc(currentStage.note)}</div>`:""}
+      </div>
+      ${currentStage?`<span class="badge ${(STATUS_DISPLAY[currentStage.status||""]||STATUS_DISPLAY[""]).cls}">${(STATUS_DISPLAY[currentStage.status||""]||STATUS_DISPLAY[""]).label}</span>`:""}
+    </div>`;
+    stages.forEach((st,i) => {
+      const last=i===stages.length-1, disp=STATUS_DISPLAY[st.status||""]||STATUS_DISPLAY[""];
+      h+=`<div class="sw"><div class="sl">
+        <div class="si ${stageCls(st)}">${stageIcon(st)}</div>
+        ${!last?`<div class="sline ${isStageComplete(st)?"sline-done":""}"></div>`:""}
+      </div><div class="sr">
+        <div class="sname">${esc(st.name)}</div>
+        ${st.time?`<div class="stime">⏱ ${esc(st.time)}</div>`:""}
+        <div class="badge ${disp.cls}">${disp.label}</div>
+        ${st.note?`<div class="snote">${esc(st.note)}</div>`:""}
+      </div></div>`;
+    });
+  } else if (S.tab === "docs") {
+    d.docs.filter(g=>!g.fb||fb).forEach(g=>{
+      h+=`<div class="dc"><div class="dch ${g.fb?"dch-fb":""}">${esc(g.group)}</div>`;
+      g.items.forEach(item=>{h+=`<div class="dr"><div class="dic ${dIc(item.status)}">${dCh(item.status)}</div><span>${esc(item.name)}</span>${dTag(item.status)}</div>`;});
+      h+=`</div>`;
+    });
+  }
+  h += `</div><div class="footer">Winner Holistic Consultants · Client Preview</div>`;
+  return h;
+}
+
+boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>WHC – Login</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap"/>
+<link rel="stylesheet" href="../shared/style.css"/>
+<style>
+.auth-hdr{background:linear-gradient(135deg,#0d2137,#1a3a5c);padding:22px 20px;color:#fff;display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.auth-hdr-title{font-size:18px;font-weight:700;color:#fff;margin-top:4px}
+.auth-hdr-sub{font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px}
+.auth-tabs{display:flex;border-bottom:2px solid #e5e5e5;background:#fff;padding:0 18px}
+.auth-tab{padding:11px 16px;font-size:12px;font-weight:600;color:#888;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.15s}
+.auth-tab.on{color:#0d2137;border-bottom-color:#c9a752}
+.auth-body{padding:14px 18px}
+.auth-kpi-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.auth-kpi{background:#f7f7f7;border-radius:10px;padding:10px 14px;text-align:center;min-width:72px;flex:1}
+.auth-kpi-n{font-size:20px;font-weight:700;color:#0d2137}
+.auth-kpi-l{font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px}
+.auth-filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.auth-user-card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:14px;margin-bottom:10px;transition:box-shadow 0.15s}
+.auth-user-card:hover{box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+.auth-user-inactive{opacity:0.55}
+.auth-user-top{display:flex;gap:12px;align-items:flex-start}
+.auth-user-avatar{width:38px;height:38px;border-radius:50%;background:#0d2137;color:#c9a752;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0}
+.auth-user-name{font-size:14px;font-weight:600;color:#1a1a1a;display:flex;align-items:center;gap:6px}
+.auth-user-email{font-size:11px;color:#888;margin-top:1px}
+.auth-you-badge{background:#e8f4ff;color:#1a5276;font-size:9px;padding:1px 7px;border-radius:8px;font-weight:600}
+.auth-inactive-badge{background:#fde8e8;color:#a32d2d;font-size:9px;padding:1px 7px;border-radius:8px;font-weight:600}
+.auth-success{background:#d4f0e3;color:#166a3f;padding:10px 18px;font-size:13px;font-weight:600;border-bottom:1px solid #a3d4b8}
+.auth-error{background:#fde8e8;color:#a32d2d;padding:10px 18px;font-size:13px;border-bottom:1px solid #f5c1c1}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">Loading...</div></div></div>
+
+<script src="../shared/config.js"></script>
+<script src="../shared/shared.js"></script>
+<script src="auth.js"></script>
+<script>
+// ── Boot: check if already logged in ─────────────────────────
+async function boot() {
+  const session = getSession();
+
+  // Already authed as super_admin → go straight to user management
+  if (session && session.role === "super_admin") {
+    await loadUsers();
+    return;
+  }
+
+  // Check if any users exist at all (first-time setup)
+  const existing = await fbGet("users");
+  const hasUsers = existing && Object.keys(existing).length > 0;
+
+  if (!hasUsers) {
+    // First-time setup: show bootstrap form
+    renderBootstrap();
+    return;
+  }
+
+  // Normal login
+  renderLoginPage();
+}
+
+// ── First-time bootstrap ──────────────────────────────────────
+function renderBootstrap() {
+  document.getElementById("app").innerHTML = `
+  <div class="landing-hero">
+    <div class="landing-brand">Winner Holistic Consultants</div>
+    <div class="landing-title">First-time Setup</div>
+    <div class="landing-sub">Create your Super Admin account</div>
+  </div>
+  <div class="login-wrap" style="padding-top:28px"><div class="login-box">
+    <div style="font-size:12px;color:#888;margin-bottom:16px;line-height:1.6">
+      No users found. Enter the bootstrap password to create the first Super Admin account.
+    </div>
+    <div class="fl">Bootstrap password</div>
+    <input class="fi" type="password" id="bs-pw" placeholder="Admin bootstrap password" style="margin-bottom:10px"/>
+    <div class="fl">Your name</div>
+    <input class="fi" id="bs-name" placeholder="e.g. Karthik" style="margin-bottom:10px"/>
+    <div class="fl">Your email</div>
+    <input class="fi" id="bs-email" type="email" placeholder="admin@whc.ae" style="margin-bottom:10px"/>
+    <div class="fl">Set your PIN</div>
+    <input class="fi" id="bs-pin" type="password" placeholder="Min 4 characters" style="margin-bottom:10px"/>
+    <div class="fl">Confirm PIN</div>
+    <input class="fi" id="bs-pin2" type="password" placeholder="Repeat PIN" style="margin-bottom:14px"
+      onkeydown="if(event.key==='Enter')submitBootstrap()"/>
+    <div id="bs-err" style="color:#a32d2d;font-size:12px;margin-bottom:8px"></div>
+    <button class="btn btn-gold" style="width:100%;padding:11px;font-size:13px" onclick="submitBootstrap()">
+      Create Super Admin →
+    </button>
+  </div></div>`;
+}
+
+async function submitBootstrap() {
+  const pw   = document.getElementById("bs-pw")?.value || "";
+  const name = document.getElementById("bs-name")?.value.trim() || "";
+  const email= document.getElementById("bs-email")?.value.trim() || "";
+  const pin  = document.getElementById("bs-pin")?.value.trim() || "";
+  const pin2 = document.getElementById("bs-pin2")?.value.trim() || "";
+  const errEl = document.getElementById("bs-err");
+
+  if (pw !== SUPER_ADMIN_BOOTSTRAP_PW) { errEl.textContent = "Incorrect bootstrap password."; return; }
+  if (!name) { errEl.textContent = "Name is required."; return; }
+  if (!pin || pin.length < 4) { errEl.textContent = "PIN must be at least 4 characters."; return; }
+  if (pin !== pin2) { errEl.textContent = "PINs do not match."; return; }
+
+  errEl.textContent = "";
+  const hashed = await hashPin(pin);
+  const id = makeUserId();
+  const user = { id, name, email, role: "super_admin", pin: hashed, active: true, createdAt: new Date().toISOString(), assignedProjects: [] };
+  const ok = await fbSet(`users/${id}`, user);
+  if (ok) {
+    setSession(user);
+    await fbSet("auth_log", [{ at: new Date().toISOString(), by: name, action: "Super admin created", target: name, detail: "Bootstrap setup" }]);
+    await loadUsers();
+  } else {
+    errEl.textContent = "Failed to save. Check Firebase connection.";
+  }
+}
+
+// ── Normal login page ─────────────────────────────────────────
+function renderLoginPage(errMsg) {
+  document.getElementById("app").innerHTML = `
+  <div class="landing-hero">
+    <div class="landing-brand">Winner Holistic Consultants</div>
+    <div class="landing-title">Team Login</div>
+    <div class="landing-sub">Enter your name and PIN to continue</div>
+  </div>
+  <div class="login-wrap" style="padding-top:28px"><div class="login-box">
+    ${errMsg ? `<div class="err-msg">${esc(errMsg)}</div>` : ""}
+    <div class="fl" style="margin-bottom:6px">Name or Email</div>
+    <input class="fi" id="lg-name" placeholder="Your name or email" style="margin-bottom:10px"
+      autocomplete="username"/>
+    <div class="fl" style="margin-bottom:6px">PIN</div>
+    <input class="fi" id="lg-pin" type="password" placeholder="Your PIN" style="margin-bottom:16px"
+      autocomplete="current-password" onkeydown="if(event.key==='Enter')submitLogin()"/>
+    <button class="btn btn-gold" style="width:100%;padding:11px;font-size:13px" onclick="submitLogin()">
+      Login →
+    </button>
+    <div style="text-align:center;margin-top:14px;font-size:11px;color:#aaa">
+      Forgot your PIN? Contact your Super Admin.
+    </div>
+  </div></div>`;
+}
+
+async function submitLogin() {
+  const nameOrEmail = document.getElementById("lg-name")?.value.trim() || "";
+  const pin = document.getElementById("lg-pin")?.value.trim() || "";
+  if (!nameOrEmail || !pin) { renderLoginPage("Please enter your name and PIN."); return; }
+
+  document.getElementById("app").innerHTML = `<div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">Verifying...</div></div>`;
+
+  const user = await loginWithPin(nameOrEmail, pin);
+  if (!user) { renderLoginPage("Incorrect name or PIN. Please try again."); return; }
+
+  // Redirect based on role
+  if (user.role === "super_admin") {
+    // Stay on auth page as user manager
+    await loadUsers();
+  } else {
+    // Redirect to their module
+    window.location.href = ROLE_MODULE_URL[user.role] || "/";
+  }
+}
+
+// Make ROLE_MODULE_URL available here
+const ROLE_MODULE_URL = {
+  super_admin: "/auth/",
+  proposals:   "/proposals/",
+  coordinator: "/coordinator/",
+};
+
+boot();
+</script>
+</body>
+</html>

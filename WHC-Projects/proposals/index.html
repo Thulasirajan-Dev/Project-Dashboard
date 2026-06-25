@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>WHC – Proposals</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap"/>
+<link rel="stylesheet" href="../shared/style.css"/>
+<button class="scroll-top-btn" id="scrollTopBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+
+</head>
+<body>
+<div id="app"><div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">Loading...</div></div></div>
+<script src="../shared/config.js"></script>
+<script src="../shared/shared.js"></script>
+<script src="proposals-quotation.js"></script>
+<script>
+let S = {
+  proposalTab:"category", selectedCategory:"", summaryYear:new Date().getFullYear(),
+  _newQuotationCategory:"", _newQuotationNumber:"", _editingQuotation:null,
+  _summaryData:null, filterStatus:"all", filterIncharge:"all", filterSearch:"", _listRecords:[]
+};
+let CURRENT_USER = null;
+
+async function boot() {
+  CURRENT_USER = requireRole("proposals","super_admin");
+  if (!CURRENT_USER) return;
+  render();
+}
+
+function render() {
+  const root = document.getElementById("app");
+  switch (S.proposalTab) {
+    case "category":  root.innerHTML = renderCategoryPicker(); break;
+    case "new_form":  root.innerHTML = renderNewForm(); break;
+    case "list":      root.innerHTML = renderListPage(); break;
+    case "detail":    root.innerHTML = renderDetailPage(); break;
+    default:          root.innerHTML = renderCategoryPicker();
+  }
+}
+
+function renderCategoryPicker() {
+  const cats = [
+    { key:"Fitout Folder",  icon:"🏗", color:"#d4f0e3", border:"#27ae60", textCol:"#166a3f",  desc:"Retail / Commercial fitout projects" },
+    { key:"Live Folder",    icon:"⚡", color:"#e8f0fe", border:"#5b8dee", textCol:"#1a5276",  desc:"Industrial / live infrastructure projects" },
+    { key:"ID Folder",      icon:"🎨", color:"#fde8d8", border:"#e8a060", textCol:"#a04800",  desc:"Interior design projects" },
+    { key:"Private Folder", icon:"🔒", color:"#f0e8fe", border:"#9b59b6", textCol:"#4a1fb8",  desc:"Private / confidential projects" },
+  ];
+  return `<div class="pbar-header">
+    <div class="pbar-label">📋 Proposals — ${esc(CURRENT_USER?.name||"")}</div>
+    <div style="display:flex;gap:7px">
+      <button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:#c4b5fd"
+        onclick="S.proposalTab='list';loadListPage()">📂 All Quotations</button>
+      <button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:#ddd;font-size:11px"
+        onclick="clearSession();window.location.href='/auth/'">Logout</button>
+    </div>
+  </div>
+  <div class="body">
+    <div class="sbox-title" style="margin-bottom:14px;text-align:center">Select Project Category to Create New Quotation</div>
+    ${cats.map(c => `<button onclick="startNewQuotation('${c.key}')" style="width:100%;margin-bottom:10px;
+      background:${c.color};border:2px solid ${c.border};border-radius:14px;padding:16px 18px;
+      cursor:pointer;text-align:left" class="role-card">
+      <div class="role-card-icon" style="background:${c.border}22;font-size:22px">${c.icon}</div>
+      <div>
+        <div class="role-card-title" style="color:${c.textCol}">${c.key}</div>
+        <div class="role-card-sub" style="color:${c.textCol}99">${c.desc}</div>
+      </div>
+      <div class="role-card-arrow" style="color:${c.textCol}">→</div>
+    </button>`).join("")}
+  </div>
+  <div class="footer">Winner Holistic Consultants · Proposals · <a href="/auth/" style="color:#888">Logout</a></div>`;
+}
+
+function renderNewForm() {
+  return `<div class="pbar-header">
+    <div class="pbar-label" style="cursor:pointer" onclick="S.proposalTab='category';render()">← New Quotation</div>
+    <button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:#ddd" onclick="S.proposalTab='category';render()">Cancel</button>
+  </div>
+  <div class="body">${renderQuotationForm(S._newQuotationCategory, S._newQuotationNumber)}</div>`;
+}
+
+async function loadListPage() {
+  document.getElementById("app").innerHTML = `<div class="loading"><div class="spinner"></div></div>`;
+  const [fitout,live,id,priv] = await Promise.all([fbGet("quotations/fitout"),fbGet("quotations/live"),fbGet("quotations/id"),fbGet("quotations/private")]);
+  S._listRecords = [
+    ...Object.values(fitout||{}).map(r=>({...r,_cat:"Fitout Folder"})),
+    ...Object.values(live||{}).map(r=>({...r,_cat:"Live Folder"})),
+    ...Object.values(id||{}).map(r=>({...r,_cat:"ID Folder"})),
+    ...Object.values(priv||{}).map(r=>({...r,_cat:"Private Folder"})),
+  ].sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||""));
+  S.proposalTab="list"; render();
+}
+
+function renderListPage() {
+  const records=S._listRecords||[];
+  let filtered=records.filter(r=>{
+    if(S.filterStatus!=="all"&&r.open_status!==S.filterStatus)return false;
+    if(S.filterIncharge!=="all"&&r.proposal_incharge!==S.filterIncharge)return false;
+    if(S.filterSearch){const q=S.filterSearch.toLowerCase();if(!(r.proj_name||"").toLowerCase().includes(q)&&!(r.client_name||"").toLowerCase().includes(q)&&!(r.qtn_number||"").toLowerCase().includes(q)&&!(r.location||"").toLowerCase().includes(q))return false;}
+    return true;
+  });
+  const inchargeList=[...new Set(records.map(r=>r.proposal_incharge).filter(Boolean))].sort();
+  const totalNet=filtered.filter(r=>["Converted","Won"].includes(r.open_status)).reduce((s,r)=>s+(parseFloat(r.net_amount)||0),0);
+  const statusColor=s=>({Converted:"chip-done",Won:"chip-done",Open:"chip-active",Lost:"chip-not-approved",Closed:"chip-new"}[s]||"chip-new");
+  const catColors={"Fitout Folder":"#27ae60","Live Folder":"#5b8dee","ID Folder":"#e8a060","Private Folder":"#9b59b6"};
+  return `<div class="pbar-header">
+    <div class="pbar-label">📂 All Quotations (${filtered.length})</div>
+    <div style="display:flex;gap:7px">
+      <button class="btn btn-sm btn-gold" onclick="S.proposalTab='category';render()">+ New</button>
+      <button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:#ddd" onclick="loadListPage()">↻</button>
+    </div>
+  </div>
+  <div style="padding:10px 18px;background:#fff;border-bottom:1px solid #e5e5e5;display:flex;gap:14px;overflow-x:auto">
+    <div style="margin-left:auto;text-align:right;flex-shrink:0">
+      <div style="font-size:14px;font-weight:700;color:#166a3f">AED ${fmtMoney(totalNet)}</div>
+      <div style="font-size:9px;color:#888">Net confirmed</div>
+    </div>
+  </div>
+  <div style="padding:10px 18px;background:#f7f7f7;border-bottom:1px solid #e5e5e5;display:flex;gap:8px;flex-wrap:wrap">
+    <input class="fi" style="flex:2;min-width:160px;margin:0" placeholder="Search..."
+      value="${esc(S.filterSearch||"")}" oninput="S.filterSearch=this.value;render()"/>
+    <select class="fi" style="flex:1;min-width:120px;margin:0" onchange="S.filterStatus=this.value;render()">
+      <option value="all">All Status</option>
+      ${["Open","Converted","Won","Lost","Closed"].map(s=>`<option value="${s}" ${S.filterStatus===s?"selected":""}>${s}</option>`).join("")}
+    </select>
+    <select class="fi" style="flex:1;min-width:120px;margin:0" onchange="S.filterIncharge=this.value;render()">
+      <option value="all">All Incharge</option>
+      ${inchargeList.map(p=>`<option value="${p}" ${S.filterIncharge===p?"selected":""}>${esc(p)}</option>`).join("")}
+    </select>
+  </div>
+  <div style="padding:10px 18px">
+    ${!filtered.length?`<div style="text-align:center;padding:40px;color:#aaa;font-size:13px">No quotations match.</div>`:""}
+    ${filtered.map(r=>{const col=catColors[r._cat]||"#999";return `<div class="prop-card" style="cursor:pointer;border-left:4px solid ${col}"
+      onclick="S._editingQuotation=${JSON.stringify(r).replace(/</g,'\\u003c')};S.proposalTab='detail';render()">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
+        <div style="flex:1">
+          <div class="prop-card-title">${esc(r.proj_name||"Unnamed")}</div>
+          <div class="prop-card-meta">${esc(r.client_name||"—")} · ${esc(r.location||"—")}</div>
+          <div style="margin-top:5px;display:flex;gap:5px;flex-wrap:wrap">
+            <span class="status-chip" style="background:#e8f4ff;color:#1a5276">📄 ${esc(r.qtn_number)}</span>
+            <span class="status-chip ${statusColor(r.open_status)}">${esc(r.open_status||"Open")}</span>
+            <span style="background:${col}22;color:${col};font-size:10px;padding:2px 8px;border-radius:8px;font-weight:600">${(r._cat||"").replace(" Folder","")}</span>
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:15px;font-weight:700;color:#166a3f">AED ${fmtMoney(r.net_amount||0)}</div>
+        </div>
+      </div>
+    </div>`;}).join("")}
+  </div>
+  <div class="footer">Winner Holistic Consultants · Proposals · <a href="/auth/" style="color:#888">Logout</a></div>`;
+}
+
+function renderDetailPage() {
+  const r=S._editingQuotation; if(!r){S.proposalTab="list";render();return "";}
+  const catColors={"Fitout Folder":"#27ae60","Live Folder":"#5b8dee","ID Folder":"#e8a060","Private Folder":"#9b59b6"};
+  const col=catColors[r.category]||"#0d2137";
+  const fields=getCategoryFields(r.category).flatMap(g=>g.fields);
+  return `<div class="pbar-header">
+    <div class="pbar-label" style="cursor:pointer" onclick="S.proposalTab='list';render()">← ${esc(r.qtn_number)}</div>
+    <button class="btn btn-sm btn-red" onclick="deleteQuotation('${r.id}','${r.category}')">🗑 Delete</button>
+  </div>
+  <div class="body">
+    <div class="sbox">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:17px;font-weight:700;color:#1a1a1a">${esc(r.proj_name||"Unnamed")}</div>
+          <div style="font-size:12px;color:#888;margin-top:2px">${esc(r.client_name||"—")} · ${esc(r.location||"—")}</div>
+        </div>
+        <span style="background:${col}22;color:${col};padding:4px 12px;border-radius:10px;font-size:12px;font-weight:700">${esc(r.category||"")}</span>
+      </div>
+      <div class="fgrid">
+        ${fields.map(f=>`<div ${f.full?'style="grid-column:1/-1"':""}>
+          <div class="fl">${esc(f.label)}</div>
+          <div style="font-size:13px;color:#222;padding:5px 0;border-bottom:1px solid #f0f0f0">${esc(r[f.id]||"—")}</div>
+        </div>`).join("")}
+      </div>
+    </div>
+    <div class="quot-box">
+      <div class="quot-box-title">💰 Fee Summary</div>
+      <div class="fgrid">
+        <div><div class="fl">Net Amount (WHC)</div><div style="font-size:15px;font-weight:700;color:#166a3f">AED ${fmtMoney(r.net_amount||0)}</div></div>
+        <div><div class="fl">Total incl. VAT</div><div style="font-size:14px;font-weight:700;color:#1a5276">AED ${fmtMoney((r.net_amount||0)*1.05)}</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">Winner Holistic Consultants · Proposals · <a href="/auth/" style="color:#888">Logout</a></div>`;
+}
+
+boot();
+</script>
+</body>
+</html>

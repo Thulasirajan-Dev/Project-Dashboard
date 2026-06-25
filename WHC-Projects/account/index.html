@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>WHC – Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap"/>
+<link rel="stylesheet" href="../shared/style.css"/>
+<button class="scroll-top-btn" id="scrollTopBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+</head>
+<body>
+<div id="app"><div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">Loading...</div></div></div>
+
+<script src="../shared/config.js"></script>
+<script src="../shared/shared.js"></script>
+<script src="account.js"></script>
+<script src="../coordinator/coordinator.js"></script>
+<script>
+let ALL_PROJECTS = {}, PROJ = null, CURRENT_USER = null;
+let S = {
+  mode:"admin", adminTab:"proposals",
+  search:"", filterStatus:"all", filterType:"all",
+  filterCoord:"all", filterStage:"all", filterProjType:"all",
+  saving:false, saved:false, modal:null, adminPopup:null,
+  tab:"stages", coordName:"Admin",
+  selectedStages:[], bulkStatus:""
+};
+
+async function boot() {
+  CURRENT_USER = requireRole("super_admin");
+  if (!CURRENT_USER) return;
+  S.coordName = CURRENT_USER.name || "Admin";
+  await loadAll();
+}
+
+function render() {
+  const root = document.getElementById("app");
+  const overlay = renderModals();
+  if (S.mode === "project" && PROJ) { root.innerHTML = renderCoordEditor() + overlay; return; }
+  root.innerHTML = renderAdmin() + overlay;
+}
+
+boot();
+</script>
+</body>
+</html>

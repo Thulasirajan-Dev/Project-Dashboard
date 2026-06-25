@@ -1,0 +1,366 @@
+// ============================================================
+//  Winner Holistic Consultants – Shared Utilities
+//  shared/shared.js — Common to all modules
+// ============================================================
+
+// ── Firebase helpers ─────────────────────────────────────────
+const DB = FIREBASE_URL.replace(/\/$/, "");
+
+async function fbGet(path) {
+  try { const r = await fetch(`${DB}/${path}.json`); return r.ok ? r.json() : null; } catch (e) { return null; }
+}
+async function fbSet(path, data) {
+  try { const r = await fetch(`${DB}/${path}.json`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); return r.ok; } catch (e) { return false; }
+}
+async function fbDelete(path) {
+  try { const r = await fetch(`${DB}/${path}.json`, { method: "DELETE" }); return r.ok; } catch (e) { return false; }
+}
+
+// ── Auth helpers ──────────────────────────────────────────────
+function getSession() {
+  try { return JSON.parse(sessionStorage.getItem("whc_user") || "null"); } catch { return null; }
+}
+function setSession(user) {
+  sessionStorage.setItem("whc_user", JSON.stringify(user));
+}
+function clearSession() {
+  sessionStorage.removeItem("whc_user");
+}
+async function hashPin(pin) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(pin)));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+async function loginWithPin(nameOrEmail, pin) {
+  const users = await fbGet("users") || {};
+  const hashed = await hashPin(pin);
+  const match = Object.values(users).find(u =>
+    u.active !== false &&
+    (u.name?.toLowerCase() === nameOrEmail.toLowerCase() ||
+     u.email?.toLowerCase() === nameOrEmail.toLowerCase()) &&
+    u.pin === hashed
+  );
+  if (match) { setSession(match); return match; }
+  return null;
+}
+function requireRole(...roles) {
+  const user = getSession();
+  if (!user || !roles.includes(user.role)) {
+    clearSession();
+    window.location.href = "/auth/";
+    return null;
+  }
+  return user;
+}
+function makeUserId() { return "u" + Date.now() + "_" + Math.random().toString(36).substr(2, 5); }
+
+// ── String / date helpers ─────────────────────────────────────
+function esc(v) {
+  return String(v == null ? "" : v)
+    .replace(/&/g, "&amp;").replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function fmtDate(d) {
+  if (!d) return "";
+  try { const [y, m, day] = d.split("-").map(Number); return new Date(y, m - 1, day).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }); } catch (e) { return d; }
+}
+function fmtDateTime(iso) {
+  if (!iso) return "—";
+  try { const d = new Date(iso); return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) + " " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }); } catch (e) { return iso; }
+}
+function fmtMoney(n) { return Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 }); }
+function makeId() { return "p" + Date.now() + "_" + Math.random().toString(36).substr(2, 6); }
+function copyText(txt) { navigator.clipboard.writeText(txt).then(() => alert("Link copied!\n\n" + txt)).catch(() => prompt("Copy this link:", txt)); }
+function projectLink(id) { return window.location.origin + window.location.pathname + "?id=" + id; }
+
+// ── Nature / unit type helpers ────────────────────────────────
+function natureArr(u) { return Array.isArray(u) ? u : (u ? [u] : []); }
+function natureDisplay(u) { const a = natureArr(u); return a.length ? a.join(", ") : "—"; }
+function natureCSV(u) { return natureArr(u).join("; "); }
+
+// ── Constants ─────────────────────────────────────────────────
+const PROJECT_TYPES_NEW = ["Retail", "Office", "Industrial", "Residential", "Educational", "Entertainment", "Agricultural", "Other"];
+const FOLDER_CATEGORIES = ["Fitout Folder", "Live Folder", "ID Folder", "Private Folder"];
+
+const STATUS_DISPLAY = {
+  "": { label: "Pending", cls: "b-pending" },
+  "requirement-pending": { label: "Requirement list yet to send", cls: "b-pending" },
+  "awaiting-docs": { label: "Awaiting Documents", cls: "b-authority" },
+  "not-received": { label: "Not Received", cls: "b-not-approved" },
+  "hold": { label: "Hold", cls: "b-hold" },
+  "received": { label: "Received", cls: "b-approved" },
+  "submitted": { label: "Submitted in MePS", cls: "b-authority" },
+  "under-review": { label: "Under Review", cls: "b-authority" },
+  "under-review-meps": { label: "Under Review in MePS", cls: "b-authority" },
+  "under-review-portal": { label: "Under Review in Portal", cls: "b-authority" },
+  "rejected": { label: "Rejected", cls: "b-not-approved" },
+  "approved": { label: "Approved", cls: "b-approved" },
+  "waiting-applicant": { label: "Waiting on Applicant", cls: "b-hold" },
+  "not-part-scope": { label: "Not Part of Scope", cls: "b-pending" },
+  "under-preparation": { label: "Under Preparation", cls: "b-authority" },
+  "sent-client-review": { label: "Sent for Client Review", cls: "b-authority" },
+  "comments-shared": { label: "Comments Shared to Client", cls: "b-hold" },
+  "completed-signed": { label: "Completed - Signed Off", cls: "b-approved" },
+  "work-in-progress": { label: "Work in Progress", cls: "b-authority" },
+  "completed": { label: "Completed", cls: "b-approved" },
+  "inspection-scheduled": { label: "Inspection Date Scheduled", cls: "b-authority" },
+  "submitted-meps": { label: "Submitted in MePS", cls: "b-authority" },
+  "approved-bcc": { label: "Approved - BCC Received", cls: "b-approved" },
+  "pending": { label: "Pending", cls: "b-pending" },
+  "authority-progress": { label: "In-Progress", cls: "b-authority" },
+  "not-approved": { label: "Not Approved", cls: "b-not-approved" }
+};
+
+const STAGE_OPTIONS = {
+  scope: [
+    { v: "", label: "— Select Status —" }, { v: "requirement-pending", label: "Requirement list yet to send" },
+    { v: "awaiting-docs", label: "Awaiting Documents / Details / Drawings" },
+    { v: "not-received", label: "Not Received" }, { v: "hold", label: "Hold" }, { v: "received", label: "Received" }
+  ],
+  registration: [
+    { v: "", label: "— Select Status —" }, { v: "submitted", label: "Submitted in MePS" },
+    { v: "under-review", label: "Under Review in MePS" }, { v: "rejected", label: "Rejected" },
+    { v: "approved", label: "Approved" }, { v: "waiting-applicant", label: "Waiting on Applicant" }
+  ],
+  drawing_prep: [
+    { v: "", label: "— Select Status —" }, { v: "under-review", label: "Under Review" },
+    { v: "under-preparation", label: "Under Preparation" }, { v: "sent-client-review", label: "Sent for Client Review" },
+    { v: "comments-shared", label: "Comments shared to client" }, { v: "hold", label: "Hold" },
+    { v: "completed-signed", label: "Completed - Signed Off" }
+  ],
+  approval_meps: [
+    { v: "", label: "— Select Status —" }, { v: "under-review-meps", label: "Under Review in MePS" },
+    { v: "not-part-scope", label: "Not Part of scope" }, { v: "rejected", label: "Rejected" },
+    { v: "approved", label: "Approved" }, { v: "waiting-applicant", label: "Waiting on Applicant" }
+  ],
+  approval_portal: [
+    { v: "", label: "— Select Status —" }, { v: "not-part-scope", label: "Not Part of scope" },
+    { v: "under-review-portal", label: "Under Review in Portal" }, { v: "rejected", label: "Rejected" },
+    { v: "approved", label: "Approved" }, { v: "waiting-applicant", label: "Waiting on Applicant" }
+  ],
+  site_work: [
+    { v: "", label: "— Select Status —" }, { v: "work-in-progress", label: "Work in Progress" },
+    { v: "hold", label: "Hold" }, { v: "completed", label: "Completed" }
+  ],
+  inspection: [
+    { v: "", label: "— Select Status —" }, { v: "not-part-scope", label: "Not Part of scope" },
+    { v: "under-review-portal", label: "Under Review in Portal" },
+    { v: "inspection-scheduled", label: "Inspection date Scheduled" }, { v: "rejected", label: "Rejected" },
+    { v: "approved", label: "Approved" }, { v: "waiting-applicant", label: "Waiting on Applicant" }
+  ],
+  gis: [
+    { v: "", label: "— Select Status —" }, { v: "submitted-meps", label: "Submitted in MePS" },
+    { v: "under-review-meps", label: "Under Review in MePS" }, { v: "rejected", label: "Rejected" },
+    { v: "approved-bcc", label: "Approved - BCC Received" }, { v: "waiting-applicant", label: "Waiting on Applicant" }
+  ],
+  completed: [{ v: "", label: "— Select Status —" }, { v: "completed", label: "Project Fully Completed" }]
+};
+
+// ── Stage logic helpers ───────────────────────────────────────
+function isStageComplete(st) { return ["received", "approved", "completed", "completed-signed", "approved-bcc"].includes(st.status || ""); }
+function projPct(p) { const vis = p.stages || []; return Math.round(vis.filter(s => isStageComplete(s)).length / Math.max(vis.length, 1) * 100); }
+function projStatus(p) {
+  if (p.workflowStatus === "proposal") return "proposal";
+  if (p.workflowStatus === "allocated") return "allocated";
+  const pc = projPct(p); if (pc === 100) return "done";
+  const act = ["under-review", "under-review-meps", "under-review-portal", "submitted", "submitted-meps", "under-preparation", "sent-client-review", "work-in-progress", "inspection-scheduled", "authority-progress"];
+  if (pc > 0 || (p.stages || []).some(s => act.includes(s.status))) return "active";
+  return "new";
+}
+function stageIcon(st) {
+  const s = st.status || "";
+  if (["received", "approved", "completed", "completed-signed", "approved-bcc"].includes(s)) return "✓";
+  if (["under-review", "under-review-meps", "under-review-portal", "submitted", "submitted-meps", "under-preparation", "sent-client-review", "work-in-progress", "inspection-scheduled"].includes(s)) return "●";
+  if (["rejected", "not-received", "not-approved"].includes(s)) return "✗";
+  if (["hold", "comments-shared", "waiting-applicant"].includes(s)) return "⏸";
+  return "○";
+}
+function stageCls(st) {
+  const s = st.status || "";
+  if (["received", "approved", "completed", "completed-signed", "approved-bcc"].includes(s)) return "si-approved";
+  if (["under-review", "under-review-meps", "under-review-portal", "submitted", "submitted-meps", "under-preparation", "sent-client-review", "work-in-progress", "inspection-scheduled"].includes(s)) return "si-authority";
+  if (["rejected", "not-received", "not-approved"].includes(s)) return "si-not-approved";
+  if (["hold", "comments-shared", "waiting-applicant"].includes(s)) return "si-hold";
+  return "si-pending";
+}
+
+// ── Data factories ────────────────────────────────────────────
+function blankStage(name, type, time) { return { name, type, status: "", note: "", time: time || "", appNum: "", dateA: "", dateB: "" }; }
+function blankStages() {
+  return [
+    blankStage("Project Scope Analysis and Requirement Collection", "scope", ""),
+    blankStage("Project Registration", "registration", "5 working days"),
+    blankStage("ADM and CD-FLS – Drawing Preparation", "drawing_prep", ""),
+    blankStage("ADM & CD-FLS Approval", "approval_meps", "10 working days"),
+    blankStage("TAQA Drawing Preparation", "drawing_prep", ""),
+    blankStage("TAQA Drawing Approval", "approval_portal", "10 working days"),
+    blankStage("ADCD Shop Drawing Preparation", "drawing_prep", ""),
+    blankStage("ADCD Shop Drawing Approval", "approval_portal", "5 working days"),
+    blankStage("Work Start Notice Approval", "approval_portal", ""),
+    blankStage("Commencement of Site Work", "site_work", ""),
+    blankStage("TAQA Inspection Approval", "inspection", ""),
+    blankStage("Hassantuk & AMC Application Submission Initiation", "inspection", ""),
+    blankStage("ADCD Inspection", "inspection", "5-6 working days"),
+    blankStage("ADM Completion Inspection", "inspection", "7 working days"),
+    blankStage("GIS Approval", "gis", "4-5 working days"),
+    blankStage("Project Fully Completed", "completed", "")
+  ];
+}
+function blankDocs() {
+  return [
+    { group: "Project Registration – Letters (Winner Provides)", fb: false, items: [{ name: "Design and Supervision Letter", status: "pending" }, { name: "Design Owner Approval Letter", status: "pending" }, { name: "Project Estimation Value", status: "pending" }, { name: "Contractor Authorization Letter", status: "pending" }] },
+    { group: "Project Registration – Tenant Documents", fb: false, items: [{ name: "Tenant Authorized Signatory EID & POA", status: "pending" }, { name: "Valid Lease Agreement / Tawtheeq", status: "pending" }] },
+    { group: "Project Registration – Landlord Documents", fb: false, items: [{ name: "ADM NOC (Landlord)", status: "pending" }] },
+    { group: "Architecture Drawing Approval (ADM & CD-FLS)", fb: false, items: [{ name: "Architectural Drawings – Partition Layout (CAD)", status: "pending" }, { name: "Furniture Layout (CAD)", status: "pending" }, { name: "Two Internal Section Layout", status: "pending" }, { name: "Material Details", status: "pending" }, { name: "Door Details", status: "pending" }] },
+    { group: "TAQA Drawing Approval (Electricity)", fb: false, items: [{ name: "Electrical Drawing – Lighting Layout", status: "pending" }, { name: "Electrical Drawing – Cable Route", status: "pending" }, { name: "Electrical Drawing – Power Layout", status: "pending" }, { name: "Load Schedule & Emergency Lighting Layout", status: "pending" }, { name: "SLD (Single Line Diagram)", status: "pending" }, { name: "NOC addressing TAQA for Electricity & Water", status: "pending" }, { name: "Meter Photo", status: "pending" }, { name: "Latest Approved SLD / Base Built SLD", status: "pending" }, { name: "Tawtheeq", status: "pending" }] },
+    { group: "TAQA Inspection (Electricity)", fb: false, items: [{ name: "Commercial License of the Shop", status: "pending" }, { name: "Switchgear Supply Certificate + ADQCC Approval Letter", status: "pending" }, { name: "Tenant Account Details or Welcome Letter", status: "pending" }] },
+    { group: "ADCD Shop Drawing Approval", fb: false, items: [{ name: "Shop Drawings – Fire Fighting Layout (CAD)", status: "pending" }, { name: "Shop Drawings – Fire Alarm Layout (CAD)", status: "pending" }, { name: "Emergency & Exit Light Layouts (CAD)", status: "pending" }, { name: "Kitchen Ventilation Layout – F&B only", status: "na" }, { name: "Fire Suppression / Wet Chemical Layout – F&B only", status: "na" }, { name: "Undertaking Letter from All Installers", status: "pending" }, { name: "Valid ADCD Safety & Installation Certificates – All Installers", status: "pending" }, { name: "Valid ADCD Supply Certificates – All Suppliers", status: "pending" }] },
+    { group: "DOE Gas Drawing Approval", fb: true, items: [{ name: "Third Party Approved Gas Drawings in .DWF format", status: "pending" }, { name: "Third Party Drawing Approval Letter / Report", status: "pending" }, { name: "Main/Gas Contractor – Valid Fitness Certificate", status: "pending" }, { name: "Main/Gas Contractor – Valid ADCD Installation Certificate", status: "pending" }, { name: "Gas Drawing Undertaking Letter – Main Contractor", status: "pending" }, { name: "Gas Drawing Undertaking Letter – Gas Contractor", status: "pending" }, { name: "Third Party COC Certificate", status: "pending" }, { name: "Piping Size Calculation and Node Diagram", status: "pending" }] },
+    { group: "Work Start Notice", fb: false, items: [{ name: "QR Code printed on A3 – Affixed on site (photo sent)", status: "pending" }, { name: "Site Photos showing work commencement", status: "pending" }] },
+    { group: "ADCD Inspection", fb: false, items: [{ name: "Valid Hassantuk Certificate (in Arabic)", status: "pending" }, { name: "All Installers – Work Completion Letter (signed & stamped)", status: "pending" }, { name: "All Suppliers – Supply Letter (signed & stamped)", status: "pending" }, { name: "Fire-rated Gypsum Partitions Undertaking Letter (Arabic + specs)", status: "pending" }, { name: "CD Approved AMC (all protection systems & quantities)", status: "pending" }, { name: "Kitchen Duct, Fan & Wet Chemical Docs – F&B only", status: "na" }] },
+    { group: "DOE Gas Inspection", fb: true, items: [{ name: "Material Form – Complete materials list (Gas Contractor letterhead)", status: "pending" }, { name: "Gas Contractor – Trade License, Safety & Installation Certificate", status: "pending" }, { name: "Gas Supplier – Trade License, Safety & Supply Certificate", status: "pending" }, { name: "Third Party Inspection Report for Gas System", status: "pending" }, { name: "GAS AMC Contract for the Shop", status: "pending" }, { name: "TPI COC (Third Party Inspection Certificate)", status: "pending" }] },
+    { group: "ADM Completion Inspection", fb: false, items: [{ name: "100% Site Work Completed Photos", status: "pending" }, { name: "Pest Control Documents (Tenant + Company License + Tadweer Agreement) – F&B only", status: "na" }] }
+  ];
+}
+function newProj(title) {
+  return {
+    id: makeId(),
+    createdAt: new Date().toISOString().split("T")[0],
+    workflowStatus: "proposal",
+    activityLog: [], proposalLog: [],
+    proposal: { scopeHtml: "", scopeItems: [], estimatedValue: "", expectedStartDate: "", submittedBy: "", submittedAt: "", quotationNumber: "", projectTypes: [], reapprovals: [] },
+    project: { title: title || "New Project", client: "", location: "", unit: "", unitType: [], coordinator: "", consultant: "Winner Holistic Consultants" },
+    stages: blankStages(), docs: blankDocs()
+  };
+}
+function migrateProject(p) {
+  if (!p) return p;
+  if (!p.workflowStatus) p.workflowStatus = "allocated";
+  if (!p.activityLog) p.activityLog = [];
+  if (!p.proposalLog) p.proposalLog = [];
+  if (!p.proposal) p.proposal = { scopeHtml: "", estimatedValue: "", expectedStartDate: "", submittedBy: "", submittedAt: "", quotationNumber: "", projectTypes: [], reapprovals: [] };
+  if (!p.proposal.quotationNumber) p.proposal.quotationNumber = "";
+  if (!p.proposal.projectTypes) p.proposal.projectTypes = [];
+  if (!p.proposal.reapprovals) p.proposal.reapprovals = [];
+  if (!p.proposal.scopeItems) p.proposal.scopeItems = [];
+  if (p.project) {
+    if (!p.project.coordinator) p.project.coordinator = "";
+    if (!p.project.unitType) p.project.unitType = [];
+    else if (!Array.isArray(p.project.unitType)) p.project.unitType = [p.project.unitType];
+    if (p.project.customUnitType != null) delete p.project.customUnitType;
+  }
+  if (p.stages && Array.isArray(p.stages)) {
+    p.stages = p.stages.map(st => ({ type: "scope", appNum: "", dateA: "", dateB: "", ...st }));
+  }
+  return p;
+}
+
+// ── Scope / quotation helpers ─────────────────────────────────
+const SCOPE_TEMPLATES = {
+  "fnb_kitchen": {
+    label: "F&B with Kitchen Ventilation",
+    items: [
+      { ref: "B.1", title: "ADM Submission Package & Fire/Life Safety Strategy", details: "Preparation of ADM Submission Package including Key Plan, Partition Layout & Section based on Final Architectural Drawings (CAD Files). Preparation of Fire and Life Safety Strategy Layout. Submission to ADM/ADCD and obtain approval.", value: 11000 },
+      { ref: "B.2", title: "Fire Protection System Shop Drawings approval from ADCD", details: "Receipt of Fire Protection (Fire Fighting, Fire Alarm, Emergency, Exit & Fire Suppression System) shop drawings from the Fire Contractor. Completeness check, submission to ADCD, follow-up and obtain approval.", value: 5000 },
+      { ref: "B.3", title: "Kitchen Ventilation System Design Drawings for ADCD Approval", details: "Collection of complete set of Kitchen Ventilation System Drawings & Design Calculation Notes from the Specialist Contractor. Compilation and submission to ADCD for approval.", value: 5000 },
+      { ref: "B.4", title: "Completion Certificate from ADCD", details: "Coordination with Main Contractor & Fire Contractor, collect and compile documents, apply for site inspection and obtain the completion certificate.", value: 500 },
+      { ref: "B.5", title: "Completion Certificate from ADM", details: "Coordination with Main Contractor & Fire Contractor, collect and compile documents, apply for site inspection and obtain the completion certificate.", value: 500 },
+      { ref: "B.6", title: "Scope of the Local Civil Contractor", details: "Pull out the Modification Building Permit from ADM after completion of approval (item B.1). Provide letters, certificates & shop drawing approvals/completion certificates from ADM/ADCD.", value: 3000 }
+    ]
+  },
+  "retail": {
+    label: "Retail (basic)",
+    items: [
+      { ref: "A.1", title: "Project Registration in MePS", details: "Registration of project in MePS portal, submission of required letters and documents.", value: 3000 },
+      { ref: "A.2", title: "Architectural Drawing Approval (ADM & CD-FLS)", details: "Preparation and submission of partition layout, furniture layout, sections and material details.", value: 8000 },
+      { ref: "A.3", title: "TAQA Drawing Approval", details: "Preparation and submission of electrical drawings, SLD and load schedule for TAQA approval.", value: 6000 }
+    ]
+  }
+};
+function blankScopeItem() { return { ref: "", title: "New scope item", details: "", value: 0 }; }
+function scopeSubtotal(items) { return (items || []).reduce((s, i) => s + (Number(i.value) || 0), 0); }
+function scopeVat(items) { return scopeSubtotal(items) * 0.05; }
+function scopeTotal(items) { return scopeSubtotal(items) + scopeVat(items); }
+
+// ── Rich text editor helpers ──────────────────────────────────
+function rteToolbar(targetId) {
+  return `<div class="rte-toolbar">
+    <select class="rte-select" onchange="document.execCommand('formatBlock',false,this.value);this.value='p';document.getElementById('${targetId}').focus()">
+      <option value="p">Paragraph</option><option value="h2">Heading 1</option>
+      <option value="h3">Heading 2</option><option value="h4">Heading 3</option>
+    </select>
+    <select class="rte-select" onchange="document.execCommand('fontSize',false,this.value);document.getElementById('${targetId}').focus()">
+      <option value="">Font Size</option><option value="1">Small</option><option value="3">Normal</option>
+      <option value="4">Large</option><option value="5">X-Large</option>
+    </select>
+    <div class="rte-sep"></div>
+    <button class="rte-btn" title="Bold" onmousedown="event.preventDefault();document.execCommand('bold')"><b>B</b></button>
+    <button class="rte-btn" title="Italic" onmousedown="event.preventDefault();document.execCommand('italic')"><i>I</i></button>
+    <button class="rte-btn" title="Underline" onmousedown="event.preventDefault();document.execCommand('underline')"><u>U</u></button>
+    <div class="rte-sep"></div>
+    <button class="rte-btn" onmousedown="event.preventDefault();document.execCommand('insertUnorderedList')">• List</button>
+    <button class="rte-btn" onmousedown="event.preventDefault();document.execCommand('insertOrderedList')">1. List</button>
+    <div class="rte-sep"></div>
+    <button class="rte-btn" onmousedown="event.preventDefault();document.execCommand('indent')">→</button>
+    <button class="rte-btn" onmousedown="event.preventDefault();document.execCommand('outdent')">←</button>
+    <div class="rte-sep"></div>
+    <button class="rte-btn" onmousedown="event.preventDefault();document.execCommand('justifyLeft')">≡L</button>
+    <button class="rte-btn" onmousedown="event.preventDefault();document.execCommand('justifyCenter')">≡C</button>
+    <button class="rte-btn" onmousedown="event.preventDefault();document.execCommand('justifyRight')">≡R</button>
+    <div class="rte-sep"></div>
+    <button class="rte-btn" title="Insert Table" onmousedown="event.preventDefault();insertRteTable('${targetId}')">⊞ Table</button>
+  </div>
+  <div class="rte-editor" id="${targetId}" contenteditable="true" placeholder="Enter scope of work..."></div>`;
+}
+function insertRteTable(targetId) {
+  const rows = parseInt(prompt("Number of rows:", 3) || 3);
+  const cols = parseInt(prompt("Number of columns:", 3) || 3);
+  if (!rows || !cols) return;
+  let table = "<table>";
+  table += "<tr>" + Array(cols).fill("<th>Header</th>").join("") + "</tr>";
+  for (let r = 1; r < rows; r++) table += "<tr>" + Array(cols).fill("<td>Cell</td>").join("") + "</tr>";
+  table += "</table><p></p>";
+  document.getElementById(targetId)?.focus();
+  document.execCommand("insertHTML", false, table);
+}
+function rteInit(id, html) {
+  setTimeout(() => { const el = document.getElementById(id); if (el && html !== undefined) el.innerHTML = html || ""; }, 60);
+}
+
+// ── Scope item UI ─────────────────────────────────────────────
+function scopeTotalsBlock(items) {
+  return `<div style="margin-top:8px;border-top:1px solid #eee;padding-top:8px;font-size:12px">
+    <div style="display:flex;justify-content:space-between;padding:2px 0;color:#666"><span>Sub-Total</span><span>AED ${fmtMoney(scopeSubtotal(items))}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:2px 0;color:#666"><span>VAT (5%)</span><span>AED ${fmtMoney(scopeVat(items))}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:2px 0;font-weight:700;color:#222"><span>Total incl. VAT</span><span>AED ${fmtMoney(scopeTotal(items))}</span></div>
+  </div>`;
+}
+
+// ── CSV export helper ─────────────────────────────────────────
+function csvEsc(v) {
+  const s = String(v == null ? "" : v);
+  if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+// ── Document status helpers ───────────────────────────────────
+function dIc(s) {
+  if (s === "received" || s === "done") return "dic-received";
+  if (s === "not-received") return "dic-not-received";
+  if (s === "correction") return "dic-correction";
+  if (s === "na") return "dic-na";
+  return "dic-required";
+}
+function dCh(s) { if (s === "received" || s === "done") return "✓"; if (s === "not-received") return "✗"; if (s === "correction") return "!"; if (s === "na") return "–"; return "○"; }
+function dTag(s) {
+  if (s === "received" || s === "done") return `<span class="dtag dt-received">Received</span>`;
+  if (s === "not-received") return `<span class="dtag dt-not-received">Not Received</span>`;
+  if (s === "correction") return `<span class="dtag dt-correction">Correction Required</span>`;
+  if (s === "na") return `<span class="dtag dt-na">N/A</span>`;
+  return `<span class="dtag dt-required">Required</span>`;
+}
+
+// ── Scroll-to-top ─────────────────────────────────────────────
+window.addEventListener("scroll", () => {
+  const btn = document.getElementById("scrollTopBtn");
+  if (btn) btn.classList.toggle("visible", window.scrollY > 300);
+});
