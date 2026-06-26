@@ -405,3 +405,88 @@ input,select,button,textarea{font-family:inherit}
 .prop-filter-input:focus{outline:none;border-color:#c9a752}
 .scroll-top-btn{position:fixed;bottom:24px;right:18px;width:38px;height:38px;border-radius:50%;background:#c9a752;color:#0d2137;border:none;font-size:20px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.18);display:none;align-items:center;justify-content:center;z-index:998;transition:opacity 0.2s}
 .scroll-top-btn.visible{display:flex}
+
+/* ============================================================
+   DARK THEME — Slate blue-grey + gold
+   Appended override. Later rules win via the cascade, so this
+   recolors the app without editing the rules above. Meaningful
+   status colors (green/red/amber chips) are intentionally left
+   alone so they still read as approved / rejected / hold etc.
+   ============================================================ */
+:root{
+  --d-bg:#161d27;          /* app background        */
+  --d-surface:#1f2937;     /* cards / panels        */
+  --d-surface-2:#273343;   /* nested / hover        */
+  --d-line:#33404f;        /* borders               */
+  --d-text:#e7ecf2;        /* primary text          */
+  --d-text-soft:#9fb0c3;   /* secondary text        */
+  --d-text-dim:#6f8197;    /* tertiary / labels     */
+  --d-gold:#d6b75e;        /* accent                */
+  --d-gold-soft:#f0d080;
+  --d-shadow:0 10px 30px rgba(0,0,0,0.45);
+  --d-shadow-sm:0 4px 14px rgba(0,0,0,0.35);
+}
+
+body, #app{ background:var(--d-bg); color:var(--d-text); }
+
+/* ── Generic surfaces ── */
+.topbar,.tabs,.coord-search-bar,.search-bar,.admin-nav-tabs,.footer,
+.dc,.sbox,.dash-card,.kpi-card,.proj-row,.milestone-label,.modal,
+.admin-popup,.login-box,.coord-name-box,.rte-wrap,.prop-card{
+  background:var(--d-surface); color:var(--d-text);
+  border-color:var(--d-line);
+}
+.dch,.deg,.se,.deg-h,.btn-add,.pipeline-proj-row,.prop-filters,
+.rte-toolbar,.rte-editor,.coord-thead{
+  background:var(--d-surface-2); color:var(--d-text);
+  border-color:var(--d-line);
+}
+.footer{ border-top-color:var(--d-line); color:var(--d-text-dim); }
+
+/* ── Text recolor ── */
+.sname,.act-stage,.proj-row-title,.modal h3,.milestone-value,
+.dash-card-title,.coord-name,.proj-pct,.kpi-num{ color:var(--d-text); }
+.snote,.act-detail,.modal p,.proj-row-meta,.bar-label,.attn-proj,
+.dr,.die-n,.se-note,.prop-card-meta{ color:var(--d-text-soft); }
+.sec-label,.dash-card-title,.landing-section-label,.sbox-title,
+.kpi-label,.milestone-title,.act-time,.dash-empty{ color:var(--d-text-dim); }
+
+/* ── Tabs ── */
+.tab{ color:var(--d-text-soft); }
+.tab.on,.admin-nav-tab.on{ color:var(--d-gold); border-bottom-color:var(--d-gold); }
+.admin-nav-tab{ color:var(--d-text-soft); }
+.admin-nav-tabs{ border-bottom-color:var(--d-line); }
+
+/* ── Form fields ── */
+.fi,.se-ni,.se-sel,.se-note,.die-n,.die-sel,.coord-search-input,
+.coord-filter-sel,.search-input,.filter-sel,.deg-name,.scope-details-fi,
+.se-date-fi,.prop-filter-input,.rte-select{
+  background:var(--d-surface-2); color:var(--d-text);
+  border-color:var(--d-line);
+}
+.fi::placeholder,.search-input::placeholder,.coord-search-input::placeholder{ color:var(--d-text-dim); }
+.fl,.prop-filter-label{ color:var(--d-text-soft); }
+.fi:focus{ border-color:var(--d-gold); box-shadow:0 0 0 3px rgba(214,183,94,0.15); }
+
+/* ── Rich tile / card shadows (the requested look) ── */
+.kpi-card,.proj-row,.dash-card,.sbox,.prop-card,.milestone-label,
+.dc,.login-box,.coord-name-box{ box-shadow:var(--d-shadow-sm); }
+.kpi-card:hover,.proj-row:hover{
+  box-shadow:var(--d-shadow); transform:translateY(-3px);
+  border-color:var(--d-gold);
+}
+.dc:hover,.sbox:hover{ box-shadow:var(--d-shadow); }
+
+/* ── Misc surfaces that were light ── */
+.se-num{ background:#0b1118; }
+.btn-add{ border-color:var(--d-line); color:var(--d-text-soft); }
+.btn-add:hover{ background:var(--d-surface-2); border-color:var(--d-gold); color:var(--d-gold); }
+.bar-track,.mini-bar-bg{ background:var(--d-surface-2); }
+.pipeline-pill{ background:var(--d-surface-2); border-color:var(--d-line); color:var(--d-text-soft); }
+.coord-row,.attn-row,.act-row,.prop-act-row{ border-bottom-color:var(--d-line); }
+.coord-row:hover,.attn-row:hover,.bar-row:hover,.pipeline-proj-row:hover{ background:var(--d-surface-2); }
+.spinner{ border-color:var(--d-line); border-top-color:var(--d-gold); }
+.modal-large::-webkit-scrollbar-thumb{ background:var(--d-gold); }
+
+/* Login box gets a deeper lift */
+.login-box,.coord-name-box{ box-shadow:var(--d-shadow); }

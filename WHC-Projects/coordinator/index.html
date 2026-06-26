@@ -10,6 +10,12 @@
 <button class="scroll-top-btn" id="scrollTopBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
 </head>
 <body>
+<!-- Back to Portal (floating) -->
+<a href="/auth/" class="back-portal-btn" title="Back to Portal">← Portal</a>
+<style>
+.back-portal-btn{position:fixed;top:14px;left:14px;z-index:9999;background:rgba(13,33,55,0.92);color:#fff;text-decoration:none;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;padding:8px 14px;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,0.18);transition:all 0.15s;backdrop-filter:blur(4px)}
+.back-portal-btn:hover{background:#c9a752;color:#0d2137;transform:translateX(-2px)}
+</style>
 <div id="app"><div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">Loading...</div></div></div>
 <script src="../shared/config.js"></script>
 <script src="../shared/shared.js"></script>
