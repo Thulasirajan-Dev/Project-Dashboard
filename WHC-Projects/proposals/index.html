@@ -11,6 +11,19 @@
 
 </head>
 <body>
+<!-- Back to Portal (floating) -->
+<a href="/auth/" class="back-portal-btn" title="Back to Portal">← Portal</a>
+<style>
+.back-portal-btn{position:fixed;top:14px;left:14px;z-index:9999;background:rgba(13,33,55,0.92);color:#fff;text-decoration:none;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;padding:8px 14px;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,0.18);transition:all 0.15s;backdrop-filter:blur(4px)}
+.back-portal-btn:hover{background:#c9a752;color:#0d2137;transform:translateX(-2px)}
+</style>
+<style>
+/* Proposals: keep top-left corner clear so the floating Portal button
+   doesn't collide with the pbar-header label (matches Coordinator layout). */
+.back-portal-btn{z-index:10000}
+.pbar-header{padding-left:108px}
+@media(max-width:520px){.pbar-header{padding-left:96px}}
+</style>
 <div id="app"><div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">Loading...</div></div></div>
 <script src="../shared/config.js"></script>
 <script src="../shared/shared.js"></script>
@@ -52,8 +65,6 @@ function renderCategoryPicker() {
     <div style="display:flex;gap:7px">
       <button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:#c4b5fd"
         onclick="S.proposalTab='list';loadListPage()">📂 All Quotations</button>
-      <button class="btn btn-sm" style="background:rgba(255,255,255,0.12);color:#c9a752;font-weight:600;margin-right:2px"
-        onclick="window.location.href='/auth/'">← Portal</button>
       <button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:#ddd;font-size:11px"
         onclick="clearSession();window.location.href='/auth/'">Logout</button>
     </div>
@@ -77,8 +88,7 @@ function renderCategoryPicker() {
 function renderNewForm() {
   return `<div class="pbar-header">
     <div class="pbar-label" style="cursor:pointer" onclick="S.proposalTab='category';render()">← New Quotation</div>
-    <button class="btn btn-sm" style="background:rgba(201,167,82,0.18);color:#c9a752;font-weight:600" onclick="window.location.href='/auth/'">← Portal</button>
-      <button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:#ddd" onclick="S.proposalTab='category';render()">Cancel</button>
+    <button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:#ddd" onclick="S.proposalTab='category';render()">Cancel</button>
   </div>
   <div class="body">${renderQuotationForm(S._newQuotationCategory, S._newQuotationNumber)}</div>`;
 }
@@ -110,7 +120,6 @@ function renderListPage() {
   return `<div class="pbar-header">
     <div class="pbar-label">📂 All Quotations (${filtered.length})</div>
     <div style="display:flex;gap:7px">
-      <button class="btn btn-sm" style="background:rgba(201,167,82,0.18);color:#c9a752;font-weight:600" onclick="window.location.href='/auth/'">← Portal</button>
       <button class="btn btn-sm btn-gold" onclick="S.proposalTab='category';render()">+ New</button>
       <button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:#ddd" onclick="loadListPage()">↻</button>
     </div>
@@ -163,8 +172,7 @@ function renderDetailPage() {
   const fields=getCategoryFields(r.category).flatMap(g=>g.fields);
   return `<div class="pbar-header">
     <div class="pbar-label" style="cursor:pointer" onclick="S.proposalTab='list';render()">← ${esc(r.qtn_number)}</div>
-    <button class="btn btn-sm" style="background:rgba(201,167,82,0.18);color:#c9a752;font-weight:600" onclick="window.location.href='/auth/'">← Portal</button>
-      <button class="btn btn-sm btn-red" onclick="deleteQuotation('${r.id}','${r.category}')">🗑 Delete</button>
+    <button class="btn btn-sm btn-red" onclick="deleteQuotation('${r.id}','${r.category}')">🗑 Delete</button>
   </div>
   <div class="body">
     <div class="sbox">
