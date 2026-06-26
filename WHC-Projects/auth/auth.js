@@ -21,6 +21,13 @@ const ROLE_MODULE_URL = {
   coordinator: "/coordinator/",
 };
 
+// What each role can access — shown on user cards so permissions are clear.
+const ROLE_ACCESS = {
+  super_admin: ["Proposals","Coordinator","Summary","Account","Users"],
+  proposals:   ["Proposals","Client links"],
+  coordinator: ["Coordinator","Client links"],
+};
+
 // ── State ─────────────────────────────────────────────────────
 let AS = {
   tab: "users",          // users | add | edit | activity
@@ -66,6 +73,7 @@ async function logAuthActivity(action, targetName, detail) {
 
 // ── Add user ──────────────────────────────────────────────────
 async function submitAddUser() {
+  if (AS.saving) return;            // ignore rapid double-clicks
   const name  = document.getElementById("au-name")?.value.trim();
   const email = document.getElementById("au-email")?.value.trim();
   const role  = document.getElementById("au-role")?.value;
@@ -81,6 +89,13 @@ async function submitAddUser() {
   if (dup) { AS.err = `A user named "${name}" already exists.`; renderAuth(); return; }
 
   AS.saving = true; AS.err = ""; renderAuth();
+
+  // Re-check the live DB right before writing (covers another open tab).
+  const fresh = (await fbGet("users")) || {};
+  if (Object.values(fresh).some(u => (u.name||"").toLowerCase() === name.toLowerCase())) {
+    AS.users = fresh;
+    AS.saving = false; AS.err = `A user named "${name}" already exists.`; renderAuth(); return;
+  }
   const hashed = await hashPin(pin);
   const id = makeUserId();
   const user = {
@@ -288,6 +303,10 @@ function renderUserList(session) {
             <span style="font-size:10px;color:#aaa">Joined: ${u.createdAt ? fmtDate(u.createdAt.split("T")[0]) : "—"}</span>
             <span style="font-size:10px;color:#aaa;cursor:pointer;text-decoration:underline"
               onclick="copyModuleLink('${u.role}')">📋 Copy module link</span>
+          </div>
+          <div style="margin-top:6px;font-size:10.5px;color:#888">
+            <b style="color:#777">Access:</b>
+            ${(ROLE_ACCESS[u.role]||["—"]).map(m=>`<span style="display:inline-block;background:#eef0fb;color:#3C3489;padding:1px 7px;border-radius:7px;margin:2px 3px 0 0;font-weight:600">${m}</span>`).join("")}
           </div>
         </div>
 

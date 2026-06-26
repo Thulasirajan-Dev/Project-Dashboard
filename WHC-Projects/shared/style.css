@@ -414,17 +414,17 @@ input,select,button,textarea{font-family:inherit}
    alone so they still read as approved / rejected / hold etc.
    ============================================================ */
 :root{
-  --d-bg:#161d27;          /* app background        */
-  --d-surface:#1f2937;     /* cards / panels        */
-  --d-surface-2:#273343;   /* nested / hover        */
-  --d-line:#33404f;        /* borders               */
-  --d-text:#e7ecf2;        /* primary text          */
-  --d-text-soft:#9fb0c3;   /* secondary text        */
-  --d-text-dim:#6f8197;    /* tertiary / labels     */
-  --d-gold:#d6b75e;        /* accent                */
-  --d-gold-soft:#f0d080;
-  --d-shadow:0 10px 30px rgba(0,0,0,0.45);
-  --d-shadow-sm:0 4px 14px rgba(0,0,0,0.35);
+  --d-bg:#222748;          /* app background — indigo / blue-violet, lighter */
+  --d-surface:#2e3560;     /* cards / panels        */
+  --d-surface-2:#3a4275;   /* nested / hover        */
+  --d-line:#474f86;        /* borders               */
+  --d-text:#eef0fb;        /* primary text          */
+  --d-text-soft:#b9c0e6;   /* secondary text        */
+  --d-text-dim:#8b93c4;    /* tertiary / labels     */
+  --d-gold:#e3c468;        /* accent                */
+  --d-gold-soft:#f3da8c;
+  --d-shadow:0 10px 30px rgba(20,16,50,0.45);
+  --d-shadow-sm:0 4px 14px rgba(20,16,50,0.35);
 }
 
 body, #app{ background:var(--d-bg); color:var(--d-text); }
@@ -514,7 +514,48 @@ body, #app{ background:var(--d-bg); color:var(--d-text); }
 /* Light-tinted info boxes (e.g. #fdf8f5, #fff8e6) become dark so
    their dark text stays readable. Scoped to specific tints only. */
 [style*="background:#fdf8f5"],[style*="background:#fff8e6"],
-[style*="background:#f7f7f7"],[style*="background:#f9f9f9"]{ background:#243040 !important; }
+[style*="background:#f7f7f7"],[style*="background:#f9f9f9"]{ background:#3a4275 !important; }
 
 /* Keep the green money figures readable (they were #166a3f on white) */
 [style*="color:#166a3f"]{ color:#5fcf95 !important; }
+
+
+/* ============================================================
+   USER MANAGEMENT DASHBOARD (auth module) — dark indigo styling
+   These classes are emitted by auth.js but had no CSS, so the
+   page rendered unstyled. Defined here to match the theme.
+   ============================================================ */
+.auth-hdr{background:linear-gradient(135deg,#272c54,#3a4275);padding:20px 24px;color:#eef0fb;display:flex;justify-content:space-between;align-items:flex-start;gap:14px;border-bottom:1px solid #474f86}
+.auth-hdr .hdr-logo{font-size:12px;letter-spacing:2px;color:#e3c468;text-transform:uppercase;font-weight:600}
+.auth-hdr-title{font-family:'Playfair Display',serif;font-size:21px;color:#fff;margin-top:4px}
+.auth-hdr-sub{font-size:11.5px;color:rgba(255,255,255,0.6);margin-top:2px}
+
+.auth-tabs{display:flex;gap:4px;background:#272c54;padding:0 18px;border-bottom:1px solid #474f86}
+.auth-tab{padding:13px 18px;font-size:13px;font-weight:600;color:#b9c0e6;cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;user-select:none}
+.auth-tab:hover{color:#fff}
+.auth-tab.on{color:#e3c468;border-bottom-color:#e3c468}
+
+.auth-body{max-width:860px;margin:0 auto;padding:22px 18px 50px}
+.auth-success{max-width:860px;margin:14px auto 0;background:#1f5135;color:#9be8bb;border:1px solid #2e7a50;border-radius:9px;padding:10px 14px;font-size:13px}
+.auth-error{max-width:860px;margin:14px auto 0;background:#5a2230;color:#f3b3c0;border:1px solid #8a3349;border-radius:9px;padding:10px 14px;font-size:13px}
+
+.auth-kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-bottom:20px}
+.auth-kpi{background:linear-gradient(160deg,#2e3560,#272c54);border:1px solid #474f86;border-radius:13px;padding:16px 14px;text-align:center;box-shadow:0 4px 14px rgba(20,16,50,0.35)}
+.auth-kpi-n{font-size:24px;font-weight:700;color:#eef0fb;line-height:1}
+.auth-kpi-l{font-size:10.5px;color:#8b93c4;margin-top:6px;text-transform:uppercase;letter-spacing:0.5px}
+
+.auth-filter-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+
+.auth-user-card{background:linear-gradient(160deg,#2e3560,#272c54);border:1px solid #474f86;border-radius:14px;padding:16px 18px;margin-bottom:12px;box-shadow:0 4px 14px rgba(20,16,50,0.3);transition:all 0.15s}
+.auth-user-card:hover{box-shadow:0 10px 28px rgba(20,16,50,0.5);border-color:#5b63a5}
+.auth-user-inactive{opacity:0.6}
+.auth-user-top{display:flex;gap:14px;align-items:flex-start}
+.auth-user-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#e3c468,#caa84a);color:#272c54;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0}
+.auth-user-name{font-size:15px;font-weight:700;color:#f3f4fd;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.auth-user-email{font-size:12px;color:#b9c0e6;margin-top:2px}
+.auth-you-badge{background:#e3c468;color:#272c54;font-size:10px;font-weight:700;padding:1px 8px;border-radius:8px}
+.auth-inactive-badge{background:#5a2230;color:#f3b3c0;font-size:10px;font-weight:600;padding:1px 8px;border-radius:8px}
+
+/* Make the access pills readable on the dark cards */
+.auth-user-card [style*="background:#eef0fb"]{ background:#3a4275 !important; color:#e3c468 !important; }
+/* Reset the inline light text inside auth cards handled by global rules above */

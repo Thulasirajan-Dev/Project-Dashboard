@@ -9,26 +9,26 @@
 <link rel="stylesheet" href="../shared/style.css"/>
 <style>
 /* ── Portal hub — DARK (slate blue-grey + gold) ── */
-.portal-top{background:linear-gradient(135deg,#0b1118,#1f2b3a);padding:18px 22px;color:#e7ecf2;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid #2a3848}
+.portal-top{background:linear-gradient(135deg,#272c54,#3a4275);padding:18px 22px;color:#eef0fb;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid #474f86}
 .portal-top .who{text-align:right;flex-shrink:0}
-.portal-brand{font-size:13px;letter-spacing:2px;color:#d6b75e;text-transform:uppercase;font-weight:600}
+.portal-brand{font-size:13px;letter-spacing:2px;color:#e3c468;text-transform:uppercase;font-weight:600}
 .portal-sub{font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px}
 .portal-wrap{max-width:760px;margin:0 auto;padding:26px 18px 60px}
-.portal-greet{font-family:'Playfair Display',serif;font-size:22px;color:#e7ecf2;margin-bottom:4px}
-.portal-greet-sub{font-size:12px;color:#9fb0c3;margin-bottom:22px}
+.portal-greet{font-family:'Playfair Display',serif;font-size:22px;color:#eef0fb;margin-bottom:4px}
+.portal-greet-sub{font-size:12px;color:#b9c0e6;margin-bottom:22px}
 .tile-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
-.tile{position:relative;background:linear-gradient(160deg,#1f2937,#1a2330);border:1px solid #33404f;border-radius:16px;padding:22px 18px;text-decoration:none;color:inherit;display:block;transition:all 0.18s;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,0.35)}
+.tile{position:relative;background:linear-gradient(160deg,#2e3560,#272c54);border:1px solid #474f86;border-radius:16px;padding:22px 18px;text-decoration:none;color:inherit;display:block;transition:all 0.18s;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,0.35)}
 .tile.on{cursor:pointer}
-.tile.on::after{content:'';position:absolute;inset:0;border-radius:16px;background:radial-gradient(120px 80px at 80% 0%,rgba(214,183,94,0.10),transparent 70%);pointer-events:none;opacity:0;transition:opacity 0.18s}
-.tile.on:hover{box-shadow:0 16px 40px rgba(0,0,0,0.55),0 0 0 1px rgba(214,183,94,0.35);transform:translateY(-4px);border-color:#d6b75e}
+.tile.on::after{content:'';position:absolute;inset:0;border-radius:16px;background:radial-gradient(120px 80px at 80% 0%,rgba(227,196,104,0.10),transparent 70%);pointer-events:none;opacity:0;transition:opacity 0.18s}
+.tile.on:hover{box-shadow:0 16px 40px rgba(0,0,0,0.55),0 0 0 1px rgba(227,196,104,0.35);transform:translateY(-4px);border-color:#e3c468}
 .tile.on:hover::after{opacity:1}
-.tile.locked{opacity:0.5;cursor:not-allowed;background:#1a212b;box-shadow:none;border-style:dashed}
-.tile-ico{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:13px;background:linear-gradient(135deg,#273343,#2f3d4f);box-shadow:inset 0 1px 0 rgba(255,255,255,0.04)}
-.tile-title{font-size:15px;font-weight:700;color:#f2f5f9;display:flex;align-items:center;gap:7px}
-.tile-desc{font-size:11.5px;color:#9fb0c3;margin-top:4px;line-height:1.5}
-.tile-lock{position:absolute;top:14px;right:14px;font-size:13px;color:#6f8197}
-.tile-go{margin-top:14px;font-size:11px;font-weight:600;color:#d6b75e;letter-spacing:0.3px}
-.tile.locked .tile-go{color:#5a6b7d}
+.tile.locked{opacity:0.5;cursor:not-allowed;background:#272c54;box-shadow:none;border-style:dashed}
+.tile-ico{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:13px;background:linear-gradient(135deg,#3a4275,#454d8c);box-shadow:inset 0 1px 0 rgba(255,255,255,0.04)}
+.tile-title{font-size:15px;font-weight:700;color:#f3f4fd;display:flex;align-items:center;gap:7px}
+.tile-desc{font-size:11.5px;color:#b9c0e6;margin-top:4px;line-height:1.5}
+.tile-lock{position:absolute;top:14px;right:14px;font-size:13px;color:#8b93c4}
+.tile-go{margin-top:14px;font-size:11px;font-weight:600;color:#e3c468;letter-spacing:0.3px}
+.tile.locked .tile-go{color:#8b93c4}
 .role-pill{display:inline-block;margin-top:2px;font-size:11px;font-weight:600;padding:2px 11px;border-radius:10px}
 </style>
 </head>
@@ -163,30 +163,48 @@ function renderBootstrap() {
   </div></div>`;
 }
 
+let _bootstrapBusy = false;   // prevents rapid double-clicks creating duplicates
 async function submitBootstrap() {
+  if (_bootstrapBusy) return;
   const pw   = document.getElementById("bs-pw")?.value || "";
   const name = document.getElementById("bs-name")?.value.trim() || "";
   const email= document.getElementById("bs-email")?.value.trim() || "";
   const pin  = document.getElementById("bs-pin")?.value.trim() || "";
   const pin2 = document.getElementById("bs-pin2")?.value.trim() || "";
   const errEl = document.getElementById("bs-err");
+  const btn = document.querySelector('button[onclick="submitBootstrap()"]');
 
   if (pw !== SUPER_ADMIN_BOOTSTRAP_PW) { errEl.textContent = "Incorrect bootstrap password."; return; }
   if (!name) { errEl.textContent = "Name is required."; return; }
   if (!pin || pin.length < 4) { errEl.textContent = "PIN must be at least 4 characters."; return; }
   if (pin !== pin2) { errEl.textContent = "PINs do not match."; return; }
 
+  _bootstrapBusy = true;
+  if (btn) { btn.disabled = true; btn.textContent = "Creating..."; }
   errEl.textContent = "";
+
+  // Re-check the DB right before writing: if any user now exists, abort
+  // (covers a second tab/click that already created the first admin).
+  const existingNow = await fbGet("users");
+  if (existingNow && Object.keys(existingNow).length > 0) {
+    errEl.textContent = "An account already exists. Please log in instead.";
+    _bootstrapBusy = false;
+    renderLoginPage("An account already exists — please log in.");
+    return;
+  }
+
   const hashed = await hashPin(pin);
   const id = makeUserId();
   const user = { id, name, email, role: "super_admin", pin: hashed, active: true, createdAt: new Date().toISOString(), assignedProjects: [] };
   const ok = await fbSet(`users/${id}`, user);
   if (ok) {
     setSession(user);
-    await fbSet("auth_log", [{ at: new Date().toISOString(), by: name, action: "Super admin created", target: name, detail: "Bootstrap setup" }]);
+    if (typeof logActivity === "function") logActivity("Users", "Super admin created", name, "Bootstrap setup");
     renderHub(user);
   } else {
     errEl.textContent = "Failed to save. Check Firebase connection.";
+    _bootstrapBusy = false;
+    if (btn) { btn.disabled = false; btn.textContent = "Create Super Admin →"; }
   }
 }
 
