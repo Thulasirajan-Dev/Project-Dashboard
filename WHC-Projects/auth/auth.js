@@ -58,6 +58,10 @@ async function logAuthActivity(action, targetName, detail) {
   if (!Array.isArray(AS.activityLog)) AS.activityLog = [];
   AS.activityLog.unshift(entry);
   await fbSet("auth_log", AS.activityLog.slice(0, 200)); // keep last 200
+  // Also mirror into the global cross-module activity log (if available).
+  if (typeof logActivity === "function") {
+    logActivity("Users", action, targetName, detail);
+  }
 }
 
 // ── Add user ──────────────────────────────────────────────────

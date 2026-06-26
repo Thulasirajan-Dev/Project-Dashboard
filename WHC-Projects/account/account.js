@@ -21,14 +21,19 @@ async function openProject(id) {
 
 async function saveProj() {
   if (!PROJ) return; S.saving = true; render();
+  const isEdit = !!PROJ.createdAt;
+  stampAudit(PROJ, isEdit);
   const ok = await fbSet("projects/" + PROJ.id, PROJ);
+  if (ok) logActivity("Account", isEdit ? "Updated project" : "Created project", PROJ.project?.title || PROJ.id, "");
   S.saving = false; S.saved = ok; render();
   setTimeout(() => { S.saved = false; render(); }, 2500);
 }
 
 async function confirmDelete() {
   if (!PROJ) return;
+  const title = PROJ.project?.title || PROJ.id;
   await fbDelete("projects/" + PROJ.id);
+  logActivity("Account", "Deleted project", title, "");
   delete ALL_PROJECTS[PROJ.id];
   PROJ = null; S.modal = null; S.mode = "admin"; render();
 }
@@ -226,6 +231,7 @@ function renderAdmin() {
     <div class="admin-nav-tab ${S.adminTab==="proposals"?"on":""}" onclick="S.adminTab='proposals';render()">📋 Proposals</div>
     <div class="admin-nav-tab ${S.adminTab==="projects"?"on":""}"  onclick="S.adminTab='projects';render()">🏗️ Projects</div>
     <div class="admin-nav-tab ${S.adminTab==="all"?"on":""}"       onclick="S.adminTab='all';render()">📁 All Records</div>
+    <div class="admin-nav-tab ${S.adminTab==="activity"?"on":""}"  onclick="S.adminTab='activity';loadActivity()">🕓 Activity Log</div>
   </div>`;
 
   // ── Proposals tab ─────────────────────────────────────────
@@ -448,8 +454,49 @@ function renderAdmin() {
         </div>`;
       }).join("")}
     </div>`;
+  } else if (S.adminTab === "activity") {
+    const rows = _activityRows || [];
+    const moduleColors = { Proposals:"#9b59b6", Coordinator:"#27ae60", Account:"#5b8dee", Users:"#e8a060" };
+    const mf = S.activityModule || "all";
+    const filtered = mf === "all" ? rows : rows.filter(r => r.module === mf);
+    h += `<div class="search-bar">
+      <select class="filter-sel" onchange="S.activityModule=this.value;render()">
+        <option value="all" ${mf==="all"?"selected":""}>All Modules</option>
+        ${["Proposals","Coordinator","Account","Users"].map(m=>`<option value="${m}" ${mf===m?"selected":""}>${m}</option>`).join("")}
+      </select>
+      <button class="btn btn-gold btn-sm" onclick="loadActivity()">↻ Refresh</button>
+      <div style="margin-left:auto;font-size:12px;color:#888;align-self:center">${filtered.length} entries</div>
+    </div>
+    <div style="padding:10px 18px">
+      ${!filtered.length ? `<div style="padding:40px;text-align:center;color:#aaa;font-size:13px">No activity recorded yet.</div>` : ""}
+      ${filtered.map(r=>{
+        const col = moduleColors[r.module] || "#888";
+        return `<div class="prop-card" style="border-left:4px solid ${col}">
+          <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start">
+            <div style="flex:1">
+              <div style="font-size:13px;color:#1a1a1a"><b>${esc(r.action||"")}</b>${r.target?` — ${esc(r.target)}`:""}</div>
+              <div style="font-size:11px;color:#888;margin-top:3px">
+                <span style="background:${col}22;color:${col};padding:1px 7px;border-radius:7px;font-weight:600">${esc(r.module||"")}</span>
+                &nbsp;by ${esc(r.by||"—")}${r.role?` <span style="color:#bbb">(${esc(r.role)})</span>`:""}
+                ${r.detail?` · ${esc(r.detail)}`:""}
+              </div>
+            </div>
+            <div style="font-size:11px;color:#999;white-space:nowrap">${fmtDateTime(r.at)}</div>
+          </div>
+        </div>`;
+      }).join("")}
+    </div>`;
   }
 
   h += `<div class="footer">Winner Holistic Consultants &nbsp;·&nbsp; Admin Dashboard &nbsp;·&nbsp; <a href="." style="color:#888">Logout</a></div>`;
   return h;
+}
+
+
+// ── Activity log (combined, cross-module) ─────────────────────
+let _activityRows = null;
+async function loadActivity() {
+  document.getElementById("app").innerHTML = `<div class="loading"><div class="spinner"></div></div>`;
+  _activityRows = (typeof getActivityLog === "function") ? await getActivityLog(null, 300) : [];
+  S.adminTab = "activity"; render();
 }

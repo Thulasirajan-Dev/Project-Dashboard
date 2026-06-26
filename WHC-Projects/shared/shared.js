@@ -16,6 +16,71 @@ async function fbDelete(path) {
   try { const r = await fetch(`${DB}/${path}.json`, { method: "DELETE" }); return r.ok; } catch (e) { return false; }
 }
 
+// ── Audit trail (shared across all modules) ──────────────────
+// stampAudit(record, isEdit): adds createdBy/createdAt or lastEditedBy/
+//   lastEditedAt and appends to record.editHistory. Returns the record.
+// logActivity(entry): appends a row to the global "activity_log" in Firebase
+//   so there is one combined feed across every module.
+function currentActor() {
+  const u = getSession() || {};
+  return { name: u.name || "Unknown", role: u.role || "", id: u.id || "" };
+}
+
+function fmtDateTime(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d)) return "—";
+  return d.toLocaleString(undefined, { year:"numeric", month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" });
+}
+
+function stampAudit(record, isEdit) {
+  const who = currentActor();
+  const now = new Date().toISOString();
+  if (!record || typeof record !== "object") return record;
+  if (isEdit) {
+    if (!record.createdAt) record.createdAt = now;
+    if (!record.createdBy) record.createdBy = who.name;
+    record.lastEditedAt = now;
+    record.lastEditedBy = who.name;
+    record.lastEditedByRole = who.role;
+  } else {
+    record.createdAt = now;
+    record.createdBy = who.name;
+    record.createdByRole = who.role;
+  }
+  const hist = Array.isArray(record.editHistory) ? record.editHistory.slice() : [];
+  hist.push({ action: isEdit ? "edited" : "created", by: who.name, role: who.role, at: now });
+  record.editHistory = hist;
+  return record;
+}
+
+// Append one entry to the global activity log. Best-effort; never blocks the save.
+async function logActivity(module, action, target, detail) {
+  try {
+    const who = currentActor();
+    const entry = {
+      at: new Date().toISOString(),
+      module: module || "",
+      action: action || "",
+      target: target || "",
+      detail: detail || "",
+      by: who.name, role: who.role
+    };
+    const key = "log_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+    await fbSet(`activity_log/${key}`, entry);
+  } catch (e) { /* logging must never break the main action */ }
+}
+
+// Fetch recent activity entries (newest first), optionally filtered by module.
+async function getActivityLog(moduleFilter, limit) {
+  const all = await fbGet("activity_log") || {};
+  let rows = Object.values(all);
+  if (moduleFilter) rows = rows.filter(r => r.module === moduleFilter);
+  rows.sort((a, b) => (b.at || "").localeCompare(a.at || ""));
+  return limit ? rows.slice(0, limit) : rows;
+}
+
+
 // ── Auth helpers ──────────────────────────────────────────────
 function getSession() {
   try { return JSON.parse(sessionStorage.getItem("whc_user") || "null"); } catch { return null; }

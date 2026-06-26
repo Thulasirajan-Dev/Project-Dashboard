@@ -101,7 +101,10 @@ function addDrawingApprovalStage() { PROJ.stages.push({ name: "New Drawing Appro
 // ── Save & load ───────────────────────────────────────────────
 async function saveProj() {
   if (!PROJ) return; S.saving = true; render();
+  const isEdit = !!PROJ.createdAt;           // first save = create, later saves = edit
+  stampAudit(PROJ, isEdit);
   const ok = await fbSet("projects/" + PROJ.id, PROJ);
+  if (ok) logActivity("Coordinator", isEdit ? "Updated project" : "Created project", PROJ.project?.title || PROJ.id, "");
   S.saving = false; S.saved = ok; render();
   setTimeout(() => { S.saved = false; render(); }, 2500);
 }
@@ -112,7 +115,9 @@ async function openProject(id) {
 }
 async function confirmDelete() {
   if (!PROJ) return;
+  const title = PROJ.project?.title || PROJ.id;
   await fbDelete("projects/" + PROJ.id);
+  logActivity("Coordinator", "Deleted project", title, "");
   PROJ = null; S.modal = null; S.mode = "coord"; S.tab = "list"; render();
 }
 

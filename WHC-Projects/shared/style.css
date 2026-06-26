@@ -490,3 +490,31 @@ body, #app{ background:var(--d-bg); color:var(--d-text); }
 
 /* Login box gets a deeper lift */
 .login-box,.coord-name-box{ box-shadow:var(--d-shadow); }
+
+
+/* ============================================================
+   DARK THEME — readability fixes for hardcoded dark text
+   Many inline styles use color:#222 / #1a1a1a / #333 / #1a5276
+   which become unreadable on dark cards. Inline styles win over
+   classes, so these use attribute selectors + !important to
+   force light text where a dark inline color was set.
+   ============================================================ */
+.proj-row-title,.prop-card-title,.hdr-title,.dash-card-title,
+.sname,.coord-name,.modal h3{ color:#f2f5f9 !important; }
+
+/* Neutralize the common hardcoded dark inline colors → light */
+[style*="color:#222"]    { color:#dfe7f0 !important; }
+[style*="color:#1a1a1a"] { color:#f2f5f9 !important; }
+[style*="color:#333"]    { color:#cdd8e4 !important; }
+[style*="color:#1a5276"] { color:#7fb4e6 !important; }   /* dark blue → lighter blue */
+[style*="color: #222"]   { color:#dfe7f0 !important; }
+[style*="color: #1a1a1a"]{ color:#f2f5f9 !important; }
+[style*="color: #333"]   { color:#cdd8e4 !important; }
+
+/* Light-tinted info boxes (e.g. #fdf8f5, #fff8e6) become dark so
+   their dark text stays readable. Scoped to specific tints only. */
+[style*="background:#fdf8f5"],[style*="background:#fff8e6"],
+[style*="background:#f7f7f7"],[style*="background:#f9f9f9"]{ background:#243040 !important; }
+
+/* Keep the green money figures readable (they were #166a3f on white) */
+[style*="color:#166a3f"]{ color:#5fcf95 !important; }

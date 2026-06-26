@@ -1,3 +1,8 @@
+// ── Display label: strip the internal " Folder" suffix for the UI ──
+// The category KEY (e.g. "Fitout Folder") is kept internally because it maps
+// to Firebase paths. This only changes what the user sees.
+function catLabel(category){ return (category||"").replace(/\s*Folder$/,""); }
+
 // ============================================================
 //  Winner Holistic Consultants – Quotation / Proposal Module
 //  proposals-quotation.js
@@ -258,15 +263,16 @@ function renderField(f, value = "") {
 }
 
 // ── Render the full quotation form ────────────────────────────
-function renderQuotationForm(category, qtnNumber, existingData = {}) {
+function renderQuotationForm(category, qtnNumber, existingData = {}, editId = "") {
   const groups = getCategoryFields(category);
   let h = `<div class="sbox">
     <div class="sbox-title" style="display:flex;justify-content:space-between;align-items:center">
-      <span>📋 ${esc(category)} — New Quotation</span>
+      <span>📋 ${esc(catLabel(category))} — ${editId ? "Edit" : "New"} Quotation</span>
       <span class="quot-num-badge" style="font-size:13px">🔢 ${esc(qtnNumber)}</span>
     </div>
     <input type="hidden" id="qf-qtn_number" value="${esc(qtnNumber)}"/>
-    <input type="hidden" id="qf-category" value="${esc(category)}"/>`;
+    <input type="hidden" id="qf-category" value="${esc(category)}"/>
+    <input type="hidden" id="qf-edit_id" value="${esc(editId)}"/>`;
 
   groups.forEach(group => {
     h += `<div class="sbox" style="margin-bottom:0;border:none;padding:0;margin-top:14px">
@@ -298,7 +304,7 @@ function renderQuotationForm(category, qtnNumber, existingData = {}) {
   </div>`;
 
   h += `<button class="btn btn-purple" style="width:100%;margin-top:16px;padding:13px;font-size:14px"
-    onclick="submitQuotation()">Submit Quotation →</button>`;
+    onclick="submitQuotation()">${editId ? "Update Quotation ✓" : "Submit Quotation →"}</button>`;
 
   h += `</div>`;
   return h;
@@ -380,20 +386,53 @@ async function submitQuotation() {
     "Private Folder":"quotations/private"
   };
   const basePath = pathMap[category];
-  const entryId = "q_" + Date.now();
-  data.createdAt = new Date().toISOString();
+
+  const editId = document.getElementById("qf-edit_id")?.value || "";
+  const isEdit = !!editId;
+  const entryId = isEdit ? editId : ("q_" + Date.now());
+
+  // ── Activity / audit trail ──────────────────────────────────
+  const who = (typeof CURRENT_USER !== "undefined" && CURRENT_USER) || getSession() || {};
+  const nowIso = new Date().toISOString();
+  const prev = (isEdit && S._editingQuotation) ? S._editingQuotation : null;
+
+  if (isEdit) {
+    // Preserve original creator + creation time.
+    data.createdAt     = (prev && prev.createdAt) || nowIso;
+    data.createdBy     = (prev && prev.createdBy) || who.name || "Unknown";
+    data.createdByRole = (prev && prev.createdByRole) || who.role || "";
+    // Record this edit.
+    data.lastEditedAt     = nowIso;
+    data.lastEditedBy     = who.name || "Unknown";
+    data.lastEditedByRole = who.role || "";
+    // Append to a running edit history (keep prior entries).
+    const history = (prev && Array.isArray(prev.editHistory)) ? prev.editHistory.slice() : [];
+    history.push({ action: "edited", by: who.name || "Unknown", role: who.role || "", at: nowIso });
+    data.editHistory = history;
+  } else {
+    data.createdAt     = nowIso;
+    data.createdBy     = who.name || "Unknown";
+    data.createdByRole = who.role || "";
+    data.editHistory   = [{ action: "created", by: who.name || "Unknown", role: who.role || "", at: nowIso }];
+  }
   data.id = entryId;
 
   document.getElementById("app").innerHTML =
-    `<div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">Saving quotation...</div></div>`;
+    `<div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">${isEdit ? "Updating" : "Saving"} quotation...</div></div>`;
 
   const ok = await fbSet(`${basePath}/${entryId}`, data);
   if (ok) {
-    // Also update monthly summary counter in Firebase
-    await updateSummaryCounter(data);
-    alert(`✅ Quotation ${data.qtn_number} saved successfully!`);
-    // Return to list
-    S.proposalTab = "list"; S.editingProposalId = null; render();
+    // Only count NEW quotations in the monthly summary (editing must not double-count).
+    if (!isEdit) await updateSummaryCounter(data);
+    if (typeof logActivity === "function") {
+      logActivity("Proposals", isEdit ? "Updated quotation" : "Created quotation",
+        data.qtn_number || data.proj_name || entryId, catLabel(category));
+    }
+    alert(`✅ Quotation ${data.qtn_number} ${isEdit ? "updated" : "saved"} successfully!`);
+    S._editingQuotation = null;
+    // Return to the type list the user was viewing (or all).
+    if (S._listCategory) { loadListPage(S._listCategory); }
+    else { S.proposalTab = "category"; render(); }
   } else {
     alert("Error saving. Check Firebase connection.");
     render();
@@ -492,12 +531,15 @@ async function deleteQuotation(id, category) {
     "Private Folder":"quotations/private"
   };
   await fbDelete(`${pathMap[category]}/${id}`);
+  if (typeof logActivity === "function") logActivity("Proposals", "Deleted quotation", id, catLabel(category));
   S._editingQuotation = null;
   render();
 }
 
 // ── Entry point: called when user picks a category ────────────
 async function startNewQuotation(category) {
+  S._editMode = false;            // ensure this is a fresh create, not an edit
+  S._editingQuotation = null;
   document.getElementById("app").innerHTML =
     `<div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">Generating quotation number...</div></div>`;
   const qtnNumber = await generateQtnNumber(category);
