@@ -52,6 +52,8 @@ function renderCategoryPicker() {
     <div style="display:flex;gap:7px">
       <button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:#c4b5fd"
         onclick="S.proposalTab='list';loadListPage()">📂 All Quotations</button>
+      <button class="btn btn-sm" style="background:rgba(255,255,255,0.12);color:#c9a752;font-weight:600;margin-right:2px"
+        onclick="window.location.href='/auth/'">← Portal</button>
       <button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:#ddd;font-size:11px"
         onclick="clearSession();window.location.href='/auth/'">Logout</button>
     </div>
@@ -75,7 +77,8 @@ function renderCategoryPicker() {
 function renderNewForm() {
   return `<div class="pbar-header">
     <div class="pbar-label" style="cursor:pointer" onclick="S.proposalTab='category';render()">← New Quotation</div>
-    <button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:#ddd" onclick="S.proposalTab='category';render()">Cancel</button>
+    <button class="btn btn-sm" style="background:rgba(201,167,82,0.18);color:#c9a752;font-weight:600" onclick="window.location.href='/auth/'">← Portal</button>
+      <button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:#ddd" onclick="S.proposalTab='category';render()">Cancel</button>
   </div>
   <div class="body">${renderQuotationForm(S._newQuotationCategory, S._newQuotationNumber)}</div>`;
 }
@@ -107,6 +110,7 @@ function renderListPage() {
   return `<div class="pbar-header">
     <div class="pbar-label">📂 All Quotations (${filtered.length})</div>
     <div style="display:flex;gap:7px">
+      <button class="btn btn-sm" style="background:rgba(201,167,82,0.18);color:#c9a752;font-weight:600" onclick="window.location.href='/auth/'">← Portal</button>
       <button class="btn btn-sm btn-gold" onclick="S.proposalTab='category';render()">+ New</button>
       <button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:#ddd" onclick="loadListPage()">↻</button>
     </div>
@@ -159,7 +163,8 @@ function renderDetailPage() {
   const fields=getCategoryFields(r.category).flatMap(g=>g.fields);
   return `<div class="pbar-header">
     <div class="pbar-label" style="cursor:pointer" onclick="S.proposalTab='list';render()">← ${esc(r.qtn_number)}</div>
-    <button class="btn btn-sm btn-red" onclick="deleteQuotation('${r.id}','${r.category}')">🗑 Delete</button>
+    <button class="btn btn-sm" style="background:rgba(201,167,82,0.18);color:#c9a752;font-weight:600" onclick="window.location.href='/auth/'">← Portal</button>
+      <button class="btn btn-sm btn-red" onclick="deleteQuotation('${r.id}','${r.category}')">🗑 Delete</button>
   </div>
   <div class="body">
     <div class="sbox">
