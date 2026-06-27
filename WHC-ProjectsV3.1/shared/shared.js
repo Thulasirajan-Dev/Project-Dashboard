@@ -891,6 +891,9 @@ function svgIcon(name, size, color) {
 const ATTACH_ENDPOINT = "/.netlify/functions/onedrive-upload";
 const ATTACH_MAX = 4 * 1024 * 1024;
 const ATTACH_TYPES = ["pdf","png","jpg","jpeg","gif","webp","heic","bmp","tif","tiff"];
+// Turn this ON after the Azure + Netlify OneDrive setup is done.
+// While false, the upload box shows a "coming soon" note instead of erroring.
+const ATTACH_ENABLED = false;
 
 function _fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -983,6 +986,17 @@ function attachmentPreview(att, opts) {
 function attachmentWidget(current, recordType, recordId, onChangeFnName) {
   const inputId = "att_" + Math.random().toString(36).slice(2, 8);
   const hasFile = current && current.url;
+  // Until OneDrive is configured, show the box but don't allow clicks that error.
+  if (!ATTACH_ENABLED) {
+    return `
+    <div class="att-wrap">
+      <div class="att-label">📎 Proof / Attachment</div>
+      ${hasFile ? `<div class="att-current-preview">${attachmentPreview(current)}</div>` : `
+      <div class="att-upload-btn" style="cursor:default;opacity:0.7;border-style:dashed">
+        ⬆ File upload — setup in progress (OneDrive not connected yet)
+      </div>`}
+    </div>`;
+  }
   return `
   <div class="att-wrap" data-rt="${esc(recordType||"")}" data-rid="${esc(recordId||"")}">
     <div class="att-label">📎 Proof / Attachment</div>

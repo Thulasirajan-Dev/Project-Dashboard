@@ -96,7 +96,7 @@ const LOCATIONS = [
   "Tourist Club Area","World Trade Centre"
 ];
 
-const PROPOSAL_INCHARGE = ["Hasna","Nandhu","Karthik","Other"];
+const PROPOSAL_INCHARGE = ["Mohamed Ramees","Mahadir","Katheeja","Vaisakh","Hasna","Abhi","Other"];
 const QTN_STATUSES = ["Sent","Yet to be Sent"];
 const OPEN_STATUS  = ["Open","Closed","Converted","Won","Lost"];
 
