@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>WHC – Proposals</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Poppins:wght@500;600;700&display=swap"/>
 <link rel="stylesheet" href="../shared/style.css"/>
 <button class="scroll-top-btn" id="scrollTopBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></button>
 
@@ -76,13 +76,13 @@ function renderCategoryPicker() {
     <div style="display:flex;gap:7px">
       <button class="btn btn-sm" style="background:#f0f2f5;color:#555;font-weight:600"
         onclick="openTypeList('')">📂 All Quotations</button>
-      ${CURRENT_USER?.role==="super_admin"?`<button class="btn btn-sm" style="background:#fff4ee;color:#f0653e;font-weight:600"
+      ${CURRENT_USER?.role==="super_admin"?`<button class="btn btn-sm" style="background:#f4f0fd;color:#6d28d9;font-weight:600"
         onclick="openActivityLog('Proposals')">🕘 Log</button>`:""}
     </div>
   </div>
   <div class="body">
     <div style="margin-bottom:6px">
-      <div style="font-family:'Playfair Display',serif;font-size:22px;color:#32325d;font-weight:700">Project Types</div>
+      <div style="font-family:'Poppins','DM Sans',sans-serif;font-size:22px;color:#32325d;font-weight:700">Project Types</div>
       <div style="font-size:12.5px;color:#8898aa;margin-top:2px">Choose a category to view existing quotations or start a new one.</div>
     </div>
     <div class="cat-grid">

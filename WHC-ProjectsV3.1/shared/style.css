@@ -8,12 +8,12 @@ input,select,button,textarea{font-family:inherit}
 #app{max-width:780px;margin:0 auto;background:#f0f2f5;min-height:100vh}
 
 /* ── LANDING ── */
-.landing-hero{background:linear-gradient(145deg,#0a1628 0%,#0d2137 50%,#1a3a5c 100%);padding:40px 24px 36px;text-align:center;position:relative;overflow:hidden}
+.landing-hero{background:linear-gradient(150deg,#2e1065 0%,#4c1d95 55%,#6d28d9 120%);padding:40px 24px 36px;text-align:center;position:relative;overflow:hidden}
 .landing-hero::before{content:'';position:absolute;top:-40px;right:-40px;width:200px;height:200px;border-radius:50%;background:rgba(201,167,82,0.06);pointer-events:none}
 .landing-hero::after{content:'';position:absolute;bottom:-60px;left:-40px;width:250px;height:250px;border-radius:50%;background:rgba(201,167,82,0.04);pointer-events:none}
 .landing-logo-mark{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#c9a752,#f0d080);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:22px;box-shadow:0 8px 24px rgba(201,167,82,0.35)}
 .landing-brand{font-size:30px;letter-spacing:3px;color:#c9a752;text-transform:uppercase;font-weight:600;margin-bottom:8px;opacity:0.8}
-.landing-title{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;color:#fff;margin-bottom:6px;line-height:1.2}
+.landing-title{font-family:'DM Sans',sans-serif;font-size:26px;font-weight:700;color:#fff;margin-bottom:6px;line-height:1.2}
 .landing-sub{font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:0}
 .landing-body{padding:28px 20px;background:#f0f2f5}
 .landing-section-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#aaa;font-weight:700;margin-bottom:14px;text-align:center}
@@ -27,7 +27,7 @@ input,select,button,textarea{font-family:inherit}
 /* ── HEADER ── */
 .hdr{background:linear-gradient(135deg,#0d2137 0%,#1b4068 100%);color:#fff;padding:24px 20px 20px}
 .hdr-logo{font-size:10px;letter-spacing:2px;color:#c9a752;text-transform:uppercase;margin-bottom:10px;font-weight:600}
-.hdr-title{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;line-height:1.2;margin-bottom:4px}
+.hdr-title{font-family:'DM Sans',sans-serif;font-size:22px;font-weight:700;line-height:1.2;margin-bottom:4px}
 .hdr-sub{font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:14px}
 .pills{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px}
 .pill{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);border-radius:20px;padding:3px 11px;font-size:11px;color:rgba(255,255,255,0.8)}
@@ -294,8 +294,8 @@ input,select,button,textarea{font-family:inherit}
 .act-time{font-size:10px;color:#bbb;white-space:nowrap;text-align:right;min-width:65px}
 
 /* ── ADMIN DASHBOARD ── */
-.admin-hdr{background:linear-gradient(135deg,#0d2137,#1b4068);color:#fff;padding:20px}
-.admin-title{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;margin-bottom:4px}
+.admin-hdr{background:linear-gradient(135deg,#2e1065,#6d28d9);color:#fff;padding:20px}
+.admin-title{font-family:'DM Sans',sans-serif;font-size:20px;font-weight:700;margin-bottom:4px}
 .admin-sub{font-size:12px;color:rgba(255,255,255,0.6)}
 .admin-nav-tabs{display:flex;background:#fff;border-bottom:2px solid #e5e5e5;padding:0 18px;overflow-x:auto}
 .admin-nav-tabs::-webkit-scrollbar{display:none}
@@ -388,7 +388,7 @@ input,select,button,textarea{font-family:inherit}
 /* ── ADMIN POPUP OVERLAY ── */
 .admin-popup-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);display:flex;align-items:flex-start;justify-content:center;z-index:998;padding:20px;overflow-y:auto;backdrop-filter:blur(2px)}
 .admin-popup{background:#fff;border-radius:16px;width:100%;max-width:720px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);overflow:hidden}
-.admin-popup-hdr{background:linear-gradient(135deg,#0d2137,#1b4068);color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between}
+.admin-popup-hdr{background:linear-gradient(135deg,#2e1065,#6d28d9);color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between}
 .admin-popup-title{font-size:14px;font-weight:600;color:#fff}
 .admin-popup-sub{font-size:11px;color:rgba(255,255,255,0.6);margin-top:2px}
 .admin-popup-close{background:rgba(255,255,255,0.15);border:none;color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
@@ -415,15 +415,15 @@ input,select,button,textarea{font-family:inherit}
    ============================================================ */
 
 /* ── User management dashboard (auth) ── */
-.auth-hdr{background:linear-gradient(135deg,#0d2137,#1a3a5c);padding:20px 24px;color:#fff;display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.auth-hdr{background:linear-gradient(135deg,#2e1065,#6d28d9);padding:20px 24px;color:#fff;display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
 .auth-hdr .hdr-logo{font-size:12px;letter-spacing:2px;color:#c9a752;text-transform:uppercase;font-weight:600}
-.auth-hdr-title{font-family:'Playfair Display',serif;font-size:21px;color:#fff;margin-top:4px}
+.auth-hdr-title{font-family:'DM Sans',sans-serif;font-size:21px;color:#fff;margin-top:4px}
 .auth-hdr-sub{font-size:11.5px;color:rgba(255,255,255,0.65);margin-top:2px}
 .auth-tabs{display:flex;gap:4px;background:#fff;padding:0 18px;border-bottom:1px solid #e8e8e8}
 .auth-tab{padding:13px 18px;font-size:13px;font-weight:600;color:#888;cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;user-select:none}
 .auth-tab:hover{color:#0d2137}
 .auth-tab.on{color:#0d2137;border-bottom-color:#c9a752}
-.auth-body{max-width:860px;margin:0 auto;padding:22px 18px 50px}
+.auth-body{max-width:1200px;margin:0 auto;padding:22px 26px 50px}
 .auth-success{max-width:860px;margin:14px auto 0;background:#e6f4ec;color:#166a3f;border:1px solid #b8e0c8;border-radius:9px;padding:10px 14px;font-size:13px}
 .auth-error{max-width:860px;margin:14px auto 0;background:#fbe9e9;color:#a32d2d;border:1px solid #f0c4c4;border-radius:9px;padding:10px 14px;font-size:13px}
 .auth-kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-bottom:20px}
@@ -466,7 +466,7 @@ input,select,button,textarea{font-family:inherit}
 .pay-bar{height:7px;background:#eef0f3;border-radius:5px;overflow:hidden;margin-bottom:10px}
 .pay-bar-fill{height:100%;background:linear-gradient(90deg,#34c77b,#27ae60);border-radius:5px;transition:width 0.3s}
 .pay-details{font-size:12px}
-.pay-details summary{cursor:pointer;color:#a07c1f;font-size:12px;font-weight:600;padding:4px 0;user-select:none}
+.pay-details summary{cursor:pointer;color:#6d28d9;font-size:12px;font-weight:600;padding:4px 0;user-select:none}
 .pay-lpo-list{margin-top:8px}
 .pay-lpo-row{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0}
 .pay-lpo-row:last-child{border-bottom:none}
@@ -475,7 +475,7 @@ input,select,button,textarea{font-family:inherit}
 .pay-lpo-amt{font-size:14px;font-weight:700;color:#0d2137}
 .pay-lpo-chip{font-size:9.5px;font-weight:700;padding:1px 8px;border-radius:7px;display:inline-block;margin-top:3px}
 .pay-card-foot{margin-top:10px;text-align:right}
-.pay-open{font-size:11.5px;color:#a07c1f;text-decoration:none;font-weight:600}
+.pay-open{font-size:11.5px;color:#6d28d9;text-decoration:none;font-weight:600}
 .pay-open:hover{text-decoration:underline}
 
 /* ── Activity log overlay (light) ── */
@@ -492,6 +492,9 @@ input,select,button,textarea{font-family:inherit}
 .actlog-search{flex:1}
 .actlog-sel:focus,.actlog-search:focus{outline:none;border-color:#c9a752}
 .actlog-refresh{background:#c9a752;color:#fff;border:none;border-radius:8px;width:36px;font-size:14px;font-weight:700;cursor:pointer}
+.actlog-clear{background:#fbe9e9;color:#a32d2d;border:1px solid #f0c4c4;border-radius:8px;padding:0 10px;height:34px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit}
+.actlog-clear:hover{background:#f8d7d7}
+.actlog-clear:focus{outline:none;border-color:#a32d2d}
 .actlog-body{overflow-y:auto;padding:6px 10px 14px}
 .actlog-loading,.actlog-empty{padding:40px;text-align:center;color:#aaa;font-size:13px}
 .actlog-row{display:flex;gap:11px;align-items:flex-start;padding:11px 10px;border-bottom:1px solid #f2f2f2}
@@ -502,7 +505,7 @@ input,select,button,textarea{font-family:inherit}
 .actlog-meta{font-size:11px;color:#888;margin-top:3px}
 .actlog-modpill{padding:1px 7px;border-radius:7px;font-weight:600;margin-right:3px}
 .actlog-tag{font-size:9px;font-weight:700;padding:1px 6px;border-radius:6px;margin-left:6px;vertical-align:middle}
-.actlog-tag-edit{background:#f3ecd8;color:#a07c1f}
+.actlog-tag-edit{background:#ece4fb;color:#6d28d9}
 .actlog-time{font-size:10.5px;color:#aaa;white-space:nowrap;flex-shrink:0;margin-top:2px}
 
 /* ── Date range bar (LPO Status & Summary) ── */
@@ -510,17 +513,17 @@ input,select,button,textarea{font-family:inherit}
 .range-lbl{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
 .range-input{border:1px solid #ddd;border-radius:8px;padding:7px 10px;font-size:12px;font-family:inherit;color:#0d2137}
 .range-input:focus{outline:none;border-color:#c9a752}
-.range-now{margin-left:auto;font-size:12px;color:#0d2137;font-weight:600;background:#f3ecd8;padding:4px 12px;border-radius:8px}
+.range-now{margin-left:auto;font-size:12px;color:#0d2137;font-weight:600;background:#ece4fb;padding:4px 12px;border-radius:8px}
 
 /* ============================================================
    CREATIVE-TIM STYLE — gradient sidebar + modern cards
-   Orange/sunset theme. Sidebar is fixed-left; content shifts right.
+   Light violet theme. Sidebar is fixed-left; content shifts right.
    ============================================================ */
 :root{
   --sb-w: 248px;
-  --sun1:#ff8a5c;   /* light orange */
-  --sun2:#f0653e;   /* mid */
-  --sun3:#e0457a;   /* pink-ish bottom (subtle) */
+  --sun1:#8b5cf6;   /* light orange */
+  --sun2:#6d28d9;   /* mid */
+  --sun3:#4c1d95;   /* pink-ish bottom (subtle) */
   --ink:#32325d;    /* primary text (Creative Tim navy-ink) */
   --ink-soft:#8898aa;
   --page:#f4f5f7;
@@ -538,7 +541,7 @@ body.has-sidebar .back-portal-btn{display:none}
 /* ── Sidebar ── */
 .whc-sidebar{position:fixed;top:0;left:0;width:var(--sb-w);height:100vh;z-index:9000;
   background:linear-gradient(160deg,var(--sun1) 0%,var(--sun2) 55%,var(--sun3) 120%);
-  display:flex;flex-direction:column;box-shadow:4px 0 24px rgba(224,69,90,0.18);
+  display:flex;flex-direction:column;box-shadow:4px 0 24px rgba(76,29,149,0.18);
   font-family:'DM Sans',system-ui,sans-serif}
 .sb-brand{display:flex;align-items:center;gap:11px;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,0.18)}
 .sb-brand-mark{width:40px;height:40px;border-radius:11px;background:rgba(255,255,255,0.22);display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:14px;letter-spacing:0.5px;backdrop-filter:blur(4px)}
@@ -558,7 +561,7 @@ body.has-sidebar .back-portal-btn{display:none}
 .sb-logout:hover{background:rgba(255,255,255,0.3)}
 
 /* Mobile toggle + backdrop (hidden on desktop) */
-.whc-sb-toggle{display:none;position:fixed;top:12px;left:12px;z-index:9500;width:42px;height:42px;border:none;border-radius:11px;background:linear-gradient(135deg,var(--sun1),var(--sun2));color:#fff;font-size:20px;cursor:pointer;box-shadow:0 4px 12px rgba(224,69,90,0.35)}
+.whc-sb-toggle{display:none;position:fixed;top:12px;left:12px;z-index:9500;width:42px;height:42px;border:none;border-radius:11px;background:linear-gradient(135deg,var(--sun1),var(--sun2));color:#fff;font-size:20px;cursor:pointer;box-shadow:0 4px 12px rgba(76,29,149,0.35)}
 .whc-sb-backdrop{display:none;position:fixed;inset:0;z-index:8999;background:rgba(50,50,93,0.4)}
 
 @media(max-width:820px){
@@ -595,7 +598,7 @@ body.has-sidebar .auth-kpi{
 body.has-sidebar .btn-gold,
 body.has-sidebar .btn-purple{
   background:linear-gradient(135deg,var(--sun1),var(--sun2))!important;
-  color:#fff!important;border:none!important;box-shadow:0 3px 8px rgba(224,69,90,0.28)}
+  color:#fff!important;border:none!important;box-shadow:0 3px 8px rgba(76,29,149,0.28)}
 body.has-sidebar .btn-gold:hover,
 body.has-sidebar .btn-purple:hover{filter:brightness(1.05)}
 
@@ -644,8 +647,8 @@ body.has-sidebar .pay-card{max-width:1100px}
 .whc-view-toggle{position:fixed;bottom:18px;right:16px;z-index:9600;
   border:none;border-radius:22px;padding:10px 16px;font-size:12px;font-weight:700;
   font-family:'DM Sans',sans-serif;cursor:pointer;color:#fff;
-  background:linear-gradient(135deg,var(--sun1,#ff8a5c),var(--sun2,#f0653e));
-  box-shadow:0 4px 14px rgba(224,69,90,0.4)}
+  background:linear-gradient(135deg,var(--sun1,#8b5cf6),var(--sun2,#6d28d9));
+  box-shadow:0 4px 14px rgba(76,29,149,0.4)}
 .whc-view-toggle:hover{filter:brightness(1.05)}
 
 /* ── In mobile view: hide editing affordances ── */
@@ -707,8 +710,8 @@ body.has-sidebar .pay-card{max-width:1100px}
 /* A subtle "view only" ribbon so users know edits are off */
 .mobile-view #app::before{
   content:"📱 Mobile view · view only — tap the button to switch to Desktop to edit";
-  display:block;background:#fff4ee;color:#c2410c;font-size:11px;font-weight:600;
-  text-align:center;padding:7px 10px;border-bottom:1px solid #ffe0cc}
+  display:block;background:#f4f0fd;color:#6b21a8;font-size:11px;font-weight:600;
+  text-align:center;padding:7px 10px;border-bottom:1px solid #e2d6f9}
 
 /* ── Proposals category cards (home page) ── */
 .cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:18px}
@@ -760,7 +763,7 @@ button[onclick*="Refresh"]:hover, .actlog-refresh:hover{ transform:rotate(180deg
   transition:background 0.15s;
 }
 .sb-link:hover .sb-ico{background:rgba(255,255,255,0.26)}
-.sb-link.on .sb-ico{background:rgba(240,101,62,0.14)}
+.sb-link.on .sb-ico{background:rgba(109,40,217,0.14)}
 
 /* Section-header emoji: give them a faint accent chip on key titles */
 .sbox-title{display:flex;align-items:center;gap:7px}
@@ -779,7 +782,7 @@ button:hover svg.spin-on-hover{transform:rotate(180deg);transition:transform 0.4
 .tp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-top:14px}
 .tp-card{position:relative;background:#fff;border:1px solid #eef0f3;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(50,50,93,0.07);transition:transform 0.18s,box-shadow 0.18s}
 .tp-card:hover{transform:translateY(-3px);box-shadow:0 12px 26px rgba(50,50,93,0.14)}
-.tp-card.tp-top{border:1px solid #ffd9a8;box-shadow:0 4px 16px rgba(240,101,62,0.16)}
+.tp-card.tp-top{border:1px solid #ffd9a8;box-shadow:0 4px 16px rgba(109,40,217,0.16)}
 .tp-rank{position:absolute;top:12px;right:14px;font-size:20px;font-weight:800;color:#c0c6d0}
 .tp-card.tp-top .tp-rank{font-size:22px}
 .tp-head{display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-right:30px}
@@ -802,7 +805,7 @@ button:hover svg.spin-on-hover{transform:rotate(180deg);transition:transform 0.4
 .att-wrap{margin:10px 0;padding:12px 14px;background:#f8f9fb;border:1px dashed #d6dbe3;border-radius:11px}
 .att-label{font-size:12px;font-weight:700;color:#525f7f;margin-bottom:8px}
 .att-upload-btn{width:100%;padding:11px;border:1px solid #d6dbe3;border-radius:9px;background:#fff;color:#525f7f;font-size:12.5px;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:inherit}
-.att-upload-btn:hover{border-color:#f0653e;color:#f0653e;background:#fff7f4}
+.att-upload-btn:hover{border-color:#6d28d9;color:#6d28d9;background:#f6f2fe}
 .att-current{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff;border:1px solid #e6e9ef;border-radius:9px;padding:9px 12px}
 .att-link{flex:1;min-width:0;color:#2563eb;text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .att-link:hover{text-decoration:underline}
@@ -821,8 +824,20 @@ button:hover svg.spin-on-hover{transform:rotate(180deg);transition:transform 0.4
 .att-thumb-lg{width:200px;height:200px}
 .att-thumb-cap{font-size:11px;color:#525f7f;font-weight:600;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .att-pdf-card{display:inline-flex;align-items:center;gap:12px;text-decoration:none;background:#fff;border:1px solid #e6e9ef;border-radius:11px;padding:12px 16px;transition:all 0.15s;box-shadow:0 1px 4px rgba(50,50,93,0.06)}
-.att-pdf-card:hover{border-color:#f0653e;box-shadow:0 6px 16px rgba(50,50,93,0.12)}
+.att-pdf-card:hover{border-color:#6d28d9;box-shadow:0 6px 16px rgba(50,50,93,0.12)}
 .att-pdf-ico{font-size:30px;line-height:1}
 .att-pdf-info{display:flex;flex-direction:column;min-width:0}
 .att-pdf-name{font-size:13.5px;font-weight:700;color:#32325d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
 .att-pdf-sub{font-size:11px;color:#8898aa;margin-top:2px}
+
+/* ── User management cards grid (wider layout) ── */
+.auth-user-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+@media(max-width:560px){.auth-user-grid{grid-template-columns:1fr}}
+
+/* ── Typography: stylish Poppins titles + DM Sans body ── */
+.landing-title, .hdr-title, .admin-title, .auth-hdr-title, .portal-greet,
+.pbar-label, .clabel, .sbox-title, .quot-box-title, .hdr-logo,
+.tile-title, .cat-card-name, .pay-title, .tp-name, .sb-brand-name,
+.auth-user-name, .pbar-header .pbar-label, h1, h2, h3 {
+  font-family: 'Poppins', 'DM Sans', sans-serif !important;
+}

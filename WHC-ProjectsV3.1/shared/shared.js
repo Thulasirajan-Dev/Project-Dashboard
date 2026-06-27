@@ -168,7 +168,7 @@ function clearSession() {
 //  data is untouched. The two new companies use their own prefix.
 // ============================================================
 const COMPANIES = [
-  { id:"whc",  name:"Winner Holistic Consultant",   short:"WHC",  prefix:"",       accent:"#f0653e" },
+  { id:"whc",  name:"Winner Holistic Consultant",   short:"WHC",  prefix:"",       accent:"#6d28d9" },
   { id:"mw",   name:"Moonway General Contracting",  short:"Moonway", prefix:"mw/",  accent:"#2563eb" },
   { id:"whsf", name:"WH Safety and Fire",           short:"WH S&F", prefix:"whsf/", accent:"#dc2626" },
 ];
@@ -569,6 +569,15 @@ async function openActivityLog(preFilterModule) {
         <input id="actlog-search" class="actlog-search" placeholder="Search name, action, target..."
           oninput="renderActivityRows()"/>
         <button class="actlog-refresh" onclick="reloadActivityLog()">↻</button>
+        ${(getSession()&&getSession().role==="super_admin")?`
+        <select class="actlog-clear" onchange="clearActivityLog(this.value); this.selectedIndex=0;" title="Clear activity log">
+          <option value="">🗑 Clear…</option>
+          <option value="30">Older than 30 days</option>
+          <option value="90">Older than 90 days</option>
+          <option value="180">Older than 6 months</option>
+          <option value="365">Older than 1 year</option>
+          <option value="all">Everything</option>
+        </select>`:""}
       </div>
       <div id="actlog-body" class="actlog-body">
         <div class="actlog-loading">Loading activity…</div>
@@ -594,6 +603,53 @@ async function reloadActivityLog() {
   if (body) body.innerHTML = `<div class="actlog-loading">Loading activity…</div>`;
   _actlogRows = await getActivityLog(null, 500);
   renderActivityRows();
+}
+
+// Clear activity log — SUPER ADMIN ONLY. mode = "all" or a number of days
+// ("30" deletes entries older than 30 days). Always double-confirms.
+async function clearActivityLog(mode) {
+  if (!mode) return;
+  const u = getSession();
+  if (!u || u.role !== "super_admin") { alert("Only Super Admins can clear the activity log."); return; }
+
+  const isAll = (mode === "all");
+  const days = parseInt(mode, 10);
+  const label = isAll ? "the ENTIRE activity log" : `all entries older than ${days} days`;
+
+  if (!confirm(`Clear ${label}?\n\nThis permanently deletes those records and cannot be undone.`)) return;
+  if (!confirm("Are you absolutely sure? This is your last chance to cancel.")) return;
+
+  const body = document.getElementById("actlog-body");
+  if (body) body.innerHTML = `<div class="actlog-loading">Clearing…</div>`;
+
+  try {
+    if (isAll) {
+      const ok = await fbDelete("activity_log");
+      if (!ok) throw new Error("delete failed");
+      try { await logActivity("Users", "Cleared activity log (all)", "", u.name || ""); } catch (e) {}
+    } else {
+      // Fetch everything, find entries older than the cutoff, delete each.
+      const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+      const all = await fbGet("activity_log", { fresh: true }) || {};
+      const oldKeys = Object.keys(all).filter(k => {
+        const at = all[k] && all[k].at ? Date.parse(all[k].at) : NaN;
+        return !isNaN(at) && at < cutoff;
+      });
+      if (!oldKeys.length) {
+        if (body) body.innerHTML = `<div class="actlog-empty">No entries older than ${days} days.</div>`;
+        setTimeout(reloadActivityLog, 1200);
+        return;
+      }
+      // Delete in batches to avoid hammering the connection.
+      for (let i = 0; i < oldKeys.length; i += 25) {
+        await Promise.all(oldKeys.slice(i, i + 25).map(k => fbDelete("activity_log/" + k)));
+      }
+      try { await logActivity("Users", `Cleared activity log (older than ${days}d)`, `${oldKeys.length} entries`, u.name || ""); } catch (e) {}
+    }
+    await reloadActivityLog();
+  } catch (e) {
+    if (body) body.innerHTML = `<div class="actlog-empty">Could not clear the log. Please try again.</div>`;
+  }
 }
 
 function renderActivityRows() {

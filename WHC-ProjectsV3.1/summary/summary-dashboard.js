@@ -352,7 +352,7 @@ function renderCoordinatorBlock(allData) {
 
   const teamNet = entries.reduce((s,[,d]) => s + (d.net||0), 0) || 1;
   const medals = ["🥇","🥈","🥉"];
-  const avatarColors = ["#f0653e","#2563eb","#059669","#7c3aed","#d97706","#db2777","#0891b2","#65a30d"];
+  const avatarColors = ["#6d28d9","#2563eb","#059669","#7c3aed","#d97706","#db2777","#0891b2","#65a30d"];
 
   return `
   <div class="sbox sbox-wide" style="margin-top:12px">

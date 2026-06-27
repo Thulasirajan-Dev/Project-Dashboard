@@ -471,6 +471,16 @@ function renderAdmin() {
         ${["Proposals","Coordinator","Account","Users"].map(m=>`<option value="${m}" ${mf===m?"selected":""}>${m}</option>`).join("")}
       </select>
       <button class="btn btn-gold btn-sm" onclick="loadActivity()">${svgIcon('refresh',14,'#fff')} Refresh</button>
+      ${(CURRENT_USER&&CURRENT_USER.role==="super_admin")?`
+      <select class="filter-sel" style="background:#fbe9e9;color:#a32d2d;border-color:#f0c4c4;font-weight:700"
+        onchange="clearActivityLog(this.value).then(()=>loadActivity()); this.selectedIndex=0;" title="Clear activity log">
+        <option value="">🗑 Clear…</option>
+        <option value="30">Older than 30 days</option>
+        <option value="90">Older than 90 days</option>
+        <option value="180">Older than 6 months</option>
+        <option value="365">Older than 1 year</option>
+        <option value="all">Everything</option>
+      </select>`:""}
       <div style="margin-left:auto;font-size:12px;color:#888;align-self:center">${filtered.length} entries</div>
     </div>
     <div style="padding:10px 18px">

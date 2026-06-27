@@ -5,22 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>WHC – Portal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Poppins:wght@500;600;700&display=swap"/>
 <link rel="stylesheet" href="../shared/style.css"/>
 <style>
+/* auth full width */
+#app{max-width:none!important}
+
 /* ── Portal hub — light, polished ── */
-.portal-top{background:linear-gradient(160deg,#ff8a5c 0%,#f0653e 60%,#e0457a 120%);padding:18px 22px;color:#fff;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid rgba(255,255,255,0.1)}
+.portal-top{background:linear-gradient(160deg,#8b5cf6 0%,#6d28d9 60%,#4c1d95 120%);padding:18px 22px;color:#fff;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid rgba(255,255,255,0.1)}
 .portal-top .who{text-align:right;flex-shrink:0}
 .portal-brand{font-size:13px;letter-spacing:2px;color:#fff;text-transform:uppercase;font-weight:600}
 .portal-sub{font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px}
-.portal-wrap{max-width:760px;margin:0 auto;padding:26px 18px 60px}
-.portal-greet{font-family:'Playfair Display',serif;font-size:22px;color:#0d2137;margin-bottom:4px}
+.portal-wrap{max-width:1100px;margin:0 auto;padding:26px 26px 60px}
+.portal-greet{font-family:'Poppins','DM Sans',sans-serif;font-size:22px;color:#0d2137;margin-bottom:4px}
 .portal-greet-sub{font-size:12px;color:#888;margin-bottom:22px}
 .tile-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
 .tile{position:relative;background:linear-gradient(160deg,#ffffff 0%,#f4f6fa 100%);border:1px solid #e4e8ef;border-radius:16px;padding:22px 18px;text-decoration:none;color:inherit;display:block;transition:transform 0.22s cubic-bezier(.2,.8,.2,1),box-shadow 0.22s,border-color 0.22s;overflow:hidden;box-shadow:0 1px 1px rgba(13,33,55,0.04),0 6px 12px rgba(13,33,55,0.08),0 14px 28px rgba(13,33,55,0.06),inset 0 1px 0 rgba(255,255,255,0.9);transform:perspective(800px) translateZ(0)}
 .tile.on{cursor:pointer}
-.tile.on::after{content:'';position:absolute;inset:0;border-radius:16px;background:radial-gradient(140px 90px at 78% 6%,rgba(240,101,62,0.16),transparent 70%);pointer-events:none;opacity:0;transition:opacity 0.22s}
-.tile.on:hover{transform:perspective(800px) translateY(-6px) rotateX(4deg) scale(1.015);box-shadow:0 2px 2px rgba(13,33,55,0.05),0 14px 24px rgba(13,33,55,0.14),0 26px 48px rgba(13,33,55,0.12),0 0 0 1px rgba(240,101,62,0.45),inset 0 1px 0 rgba(255,255,255,0.95);border-color:#f0653e}
+.tile.on::after{content:'';position:absolute;inset:0;border-radius:16px;background:radial-gradient(140px 90px at 78% 6%,rgba(109,40,217,0.16),transparent 70%);pointer-events:none;opacity:0;transition:opacity 0.22s}
+.tile.on:hover{transform:perspective(800px) translateY(-6px) rotateX(4deg) scale(1.015);box-shadow:0 2px 2px rgba(13,33,55,0.05),0 14px 24px rgba(13,33,55,0.14),0 26px 48px rgba(13,33,55,0.12),0 0 0 1px rgba(109,40,217,0.45),inset 0 1px 0 rgba(255,255,255,0.95);border-color:#6d28d9}
 .tile.on:hover::after{opacity:1}
 .tile.on:active{transform:perspective(800px) translateY(-2px) scale(1.0);transition:transform 0.08s}
 .tile.locked{opacity:0.55;cursor:not-allowed;background:#f4f5f8;box-shadow:inset 0 1px 2px rgba(13,33,55,0.05);border-style:dashed;transform:none}
@@ -33,17 +36,17 @@
 .role-pill{display:inline-block;margin-top:2px;font-size:11px;font-weight:600;padding:2px 11px;border-radius:10px}
 
 /* ── Sunset theme for the login / first-page ── */
-body{background:#fff5ef}
-.landing-hero{background:linear-gradient(150deg,#ff8a5c 0%,#f0653e 55%,#e0457a 120%)!important}
+body{background:#f6f3fe}
+.landing-hero{background:linear-gradient(150deg,#8b5cf6 0%,#6d28d9 55%,#4c1d95 120%)!important}
 .landing-brand{color:#fff!important;opacity:0.95!important}
 .landing-sub{color:rgba(255,255,255,0.7)!important}
-.login-wrap{background:linear-gradient(180deg,#fff5ef 0%,#ffe9df 100%)}
-.login-box{box-shadow:0 12px 40px rgba(224,69,90,0.18)}
-.btn-gold{background:linear-gradient(135deg,#ff8a5c,#f0653e)!important;color:#fff!important;border:none!important;box-shadow:0 4px 14px rgba(224,69,90,0.3)}
+.login-wrap{background:linear-gradient(180deg,#f6f3fe 0%,#ece4fb 100%)}
+.login-box{box-shadow:0 12px 40px rgba(76,29,149,0.18)}
+.btn-gold{background:linear-gradient(135deg,#8b5cf6,#6d28d9)!important;color:#fff!important;border:none!important;box-shadow:0 4px 14px rgba(76,29,149,0.3)}
 .btn-gold:hover{filter:brightness(1.05)}
-.fi:focus{border-color:#f0653e!important;box-shadow:0 0 0 3px rgba(240,101,62,0.12)!important}
+.fi:focus{border-color:#6d28d9!important;box-shadow:0 0 0 3px rgba(109,40,217,0.12)!important}
 .portal-greet,.portal-wrap{}
-.portal-wrap{background:linear-gradient(180deg,#fff5ef 0%,#fbf6f3 100%)}
+.portal-wrap{background:linear-gradient(180deg,#f6f3fe 0%,#fbf6f3 100%)}
 
 /* Company selector on login */
 .co-select{display:flex;flex-direction:column;gap:8px}
@@ -51,7 +54,7 @@ body{background:#fff5ef}
   padding:11px 14px;border:2px solid #e8e8e8;border-radius:11px;background:#fff;cursor:pointer;
   transition:all 0.14s;font-family:inherit;width:100%}
 .co-opt:hover{border-color:var(--co-accent)}
-.co-opt.on{border-color:var(--co-accent);background:#fff8f4;
+.co-opt.on{border-color:var(--co-accent);background:#f7f3fe;
   box-shadow:0 3px 12px rgba(0,0,0,0.08)}
 .co-opt-name{font-size:14px;font-weight:700;color:#32325d}
 .co-opt-full{font-size:11px;color:#8898aa}

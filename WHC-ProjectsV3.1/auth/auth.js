@@ -284,6 +284,7 @@ function renderUserList(session) {
     h += `<div style="text-align:center;padding:32px;color:#aaa;font-size:13px">No users match the filters.</div>`;
   }
 
+  h += `<div class="auth-user-grid">`;
   filtered.forEach(u => {
     const isMe = u.id === session?.id;
     const isActive = u.active !== false;
@@ -336,6 +337,7 @@ function renderUserList(session) {
       </div>
     </div>`;
   });
+  h += `</div>`; // close .auth-user-grid
 
   h += `</div>`;
   return h;
