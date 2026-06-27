@@ -22,7 +22,7 @@ async function loadSummaryData() {
     fbGet("quotations/id"),
     fbGet("quotations/private"),
     fbGet("summary"),
-    fbGet("projects")
+    fbGet("projects", { fresh: true })
   ]);
 
   // Aggregate LPO totals across all projects (raised vs credited).
@@ -40,7 +40,8 @@ async function loadSummaryData() {
     "ID Folder":     Object.values(id     || {}),
     "Private Folder":Object.values(priv   || {}),
     summaryCounters: summaryCounters || {},
-    lpo: { raised: lpoRaised, credited: lpoCredited, pending: lpoPending, count: lpoCount, projects: projWithLpo }
+    lpo: { raised: lpoRaised, credited: lpoCredited, pending: lpoPending, count: lpoCount, projects: projWithLpo },
+    _projects: projList
   };
 }
 
@@ -135,14 +136,45 @@ function renderSummaryDashboard(allData, selectedYear) {
 
   <!-- ── Account / LPO payments strip ── -->
   ${(() => {
-    const L = allData.lpo || { raised:0, credited:0, pending:0, count:0, projects:0 };
+    const projects = allData._projects || [];
+    const from = S.lpoFrom || "", to = S.lpoTo || "";
+    const ranged = !!(from || to);
+    const inR = (d) => { d=(d||"").slice(0,10); if(!d) return false; if(from&&d<from) return false; if(to&&d>to) return false; return true; };
+    // Recompute totals with optional date range on credited income.
+    let raised=0, credited=0, pending=0, count=0, projs=0;
+    projects.forEach(p => {
+      const lpos = Array.isArray(p.lpos)?p.lpos:[];
+      if (lpos.length) projs++;
+      lpos.forEach(l => {
+        const amt = Number(l.amount)||0; count++;
+        raised += amt;
+        if (l.status === "credited") {
+          const incDate = (l.creditedDate || l.dateRaised || "");
+          if (!ranged || inR(incDate)) credited += amt;
+        } else pending += amt;
+      });
+    });
+    const L = { raised, credited, pending, count, projects: projs };
     const collRate = L.raised > 0 ? Math.round((L.credited / L.raised) * 100) : 0;
+    const rangeTxt = ranged ? ((from||"Start")+" → "+(to||"Today")) : "All Time";
     return `<div style="padding:14px 18px;background:#fff;border-bottom:1px solid #e5e5e5">
-      <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">💳 Account · LPO Payments</div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px">💳 Account · LPO Payments</div>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="font-size:10px;color:#999;text-transform:uppercase">From</span>
+          <input type="date" value="${from}" onchange="S.lpoFrom=this.value;renderSummaryPage()"
+            style="border:1px solid #ddd;border-radius:7px;padding:5px 8px;font-size:12px"/>
+          <span style="font-size:10px;color:#999;text-transform:uppercase">To</span>
+          <input type="date" value="${to}" onchange="S.lpoTo=this.value;renderSummaryPage()"
+            style="border:1px solid #ddd;border-radius:7px;padding:5px 8px;font-size:12px"/>
+          ${ranged?`<button onclick="S.lpoFrom='';S.lpoTo='';renderSummaryPage()" style="border:none;background:#f0f0f0;color:#555;border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer">Clear</button>`:""}
+        </div>
+      </div>
+      <div style="font-size:10px;color:#aaa;margin-bottom:8px">Credited income: ${rangeTxt}</div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
         ${[
           { n: "AED "+fmtMoney(L.raised),   l: `LPO Raised (${L.count})`, c: "#1a5276", icon: "🧾" },
-          { n: "AED "+fmtMoney(L.credited), l: "Credited",                c: "#166a3f", icon: "✅" },
+          { n: "AED "+fmtMoney(L.credited), l: ranged?"Credited In Range":"Credited", c: "#166a3f", icon: "✅" },
           { n: "AED "+fmtMoney(L.pending),  l: "Pending",                 c: "#a06b00", icon: "⏳" },
           { n: collRate+"%",                l: "Collection Rate",         c: "#7b3fb8", icon: "📊" }
         ].map(k => `

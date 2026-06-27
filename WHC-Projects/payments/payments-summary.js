@@ -10,7 +10,7 @@ async function loadAndRenderPayments() {
   document.getElementById("app").innerHTML =
     `<div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">Loading payments…</div></div>`;
 
-  const projects = await fbGet("projects") || {};
+  const projects = await fbGet("projects", { fresh: true }) || {};
   const rows = Object.values(projects).map(p => {
     const t = lpoTotals(p.lpos);
     const collRate = t.raised > 0 ? Math.round((t.credited / t.raised) * 100) : 0;
@@ -37,19 +37,51 @@ async function loadAndRenderPayments() {
   renderPayments();
 }
 
+// Date of an LPO's income = credited date (fallback to date raised).
+function lpoIncomeDate(l) { return (l.creditedDate || l.dateRaised || "").slice(0,10); }
+// Is a date string within the [from,to] range (inclusive)? Empty bounds = open.
+function inRange(dateStr, from, to) {
+  if (!dateStr) return false;
+  if (from && dateStr < from) return false;
+  if (to && dateStr > to) return false;
+  return true;
+}
+function rangeActive() { return !!(S.fromDate || S.toDate); }
+function rangeLabel() {
+  if (!rangeActive()) return "All Time";
+  const f = S.fromDate ? fmtDateTime(S.fromDate) : "Start";
+  const t = S.toDate ? fmtDateTime(S.toDate) : "Today";
+  return f + " → " + t;
+}
+
 function renderPayments() {
   const rows = S._rows || [];
+  const ranged = rangeActive();
+
+  // Per-project figures, respecting the date range.
+  // In range mode: credited = income credited within the range;
+  // raised/pending stay project-wide for context.
+  const computed = rows.filter(r => r.count > 0).map(r => {
+    if (!ranged) return { ...r, rangeCredited: r.credited };
+    let rc = 0;
+    (r.lpos||[]).forEach(l => {
+      if (l.status === "credited" && inRange(lpoIncomeDate(l), S.fromDate, S.toDate)) rc += Number(l.amount)||0;
+    });
+    return { ...r, rangeCredited: rc };
+  });
 
   // Overall totals
-  const tot = rows.reduce((a, r) => {
-    a.raised += r.raised; a.credited += r.credited; a.pending += r.pending;
-    a.projects += (r.count > 0 ? 1 : 0);
+  const tot = computed.reduce((a, r) => {
+    a.raised += r.raised; a.pending += r.pending;
+    a.credited += (ranged ? r.rangeCredited : r.credited);
+    a.projects += 1;
     return a;
   }, { raised:0, credited:0, pending:0, projects:0 });
   const overallRate = tot.raised > 0 ? Math.round((tot.credited / tot.raised) * 100) : 0;
 
-  // Filter + search
-  let view = rows.filter(r => r.count > 0); // only projects that have LPOs
+  // Filter + search (in range mode, only show projects with income in range)
+  let view = computed.slice();
+  if (ranged) view = view.filter(r => r.rangeCredited > 0);
   if (S.filterStatus !== "all") view = view.filter(r => r.status === S.filterStatus);
   if (S.search) {
     const q = S.search.toLowerCase();
@@ -63,7 +95,7 @@ function renderPayments() {
   // Sort
   if (S.sortBy === "pending")  view.sort((a,b) => b.pending - a.pending);
   else if (S.sortBy === "raised")   view.sort((a,b) => b.raised - a.raised);
-  else if (S.sortBy === "credited") view.sort((a,b) => b.credited - a.credited);
+  else if (S.sortBy === "credited") view.sort((a,b) => (b.rangeCredited) - (a.rangeCredited));
   else if (S.sortBy === "name")     view.sort((a,b) => a.title.localeCompare(b.title));
 
   const statusMeta = {
@@ -74,24 +106,36 @@ function renderPayments() {
 
   let h = `
   <div class="pbar-header">
-    <div class="pbar-label">💳 Project Payment Summary</div>
-    <button class="btn btn-sm" style="background:rgba(227,196,104,0.25);color:#e3c468;font-weight:600"
-      onclick="loadAndRenderPayments()">↻ Refresh</button>
+    <div class="pbar-label">💳 LPO Status</div>
+    <button class="btn btn-sm btn-gold" onclick="loadAndRenderPayments()">↻ Refresh</button>
+  </div>
+
+  <!-- Date range selector -->
+  <div class="range-bar">
+    <span class="range-lbl">From</span>
+    <input type="date" class="range-input" value="${esc(S.fromDate)}" onchange="S.fromDate=this.value;renderPayments()"/>
+    <span class="range-lbl">To</span>
+    <input type="date" class="range-input" value="${esc(S.toDate)}" onchange="S.toDate=this.value;renderPayments()"/>
+    ${rangeActive()?`<button class="btn btn-sm" style="background:#f0f0f0;color:#555" onclick="S.fromDate='';S.toDate='';renderPayments()">Clear</button>`:""}
+    <span class="range-now">${rangeLabel()}</span>
   </div>
 
   <!-- Overall totals -->
-  <div style="padding:14px 18px;background:var(--d-surface,#2e3560);border-bottom:1px solid var(--d-line,#474f86)">
+  <div style="padding:14px 18px;background:#fff;border-bottom:1px solid #eee">
+    <div style="font-size:11px;color:#999;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">
+      ${ranged ? "Income credited " + rangeLabel() : "Overall"}
+    </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
       ${[
-        { n: fmtAED(tot.raised),   l: `Total Raised (${tot.projects} projects)`, c:"#7fb4e6", icon:"🧾" },
-        { n: fmtAED(tot.credited), l: "Total Credited",                          c:"#5fcf95", icon:"✅" },
-        { n: fmtAED(tot.pending),  l: "Total Pending",                           c:"#e3c468", icon:"⏳" },
-        { n: overallRate+"%",      l: "Collection Rate",                         c:"#c4a5f0", icon:"📊" }
+        { n: fmtAED(tot.raised),   l: `Total Raised (${tot.projects} projects)`, c:"#1a5276", icon:"🧾" },
+        { n: fmtAED(tot.credited), l: ranged ? "Credited In Range" : "Total Credited", c:"#166a3f", icon:"✅" },
+        { n: fmtAED(tot.pending),  l: "Total Pending",                           c:"#a06b00", icon:"⏳" },
+        { n: overallRate+"%",      l: "Collection Rate",                         c:"#7b3fb8", icon:"📊" }
       ].map(k => `
-        <div style="background:var(--d-surface-2,#3a4275);border-radius:10px;padding:12px;text-align:center">
+        <div style="background:#f8f9fb;border:1px solid #eee;border-radius:10px;padding:12px;text-align:center">
           <div style="font-size:18px;margin-bottom:4px">${k.icon}</div>
           <div style="font-size:19px;font-weight:700;color:${k.c}">${k.n}</div>
-          <div style="font-size:10px;color:var(--d-text-dim,#8b93c4);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">${k.l}</div>
+          <div style="font-size:10px;color:#999;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">${k.l}</div>
         </div>`).join("")}
     </div>
   </div>
@@ -112,13 +156,13 @@ function renderPayments() {
       <option value="credited" ${S.sortBy==="credited"?"selected":""}>Sort: Credited ↓</option>
       <option value="name" ${S.sortBy==="name"?"selected":""}>Sort: Name A–Z</option>
     </select>
-    <div style="margin-left:auto;font-size:12px;color:var(--d-text-dim,#8b93c4);align-self:center">${view.length} projects</div>
+    <div style="margin-left:auto;font-size:12px;color:#999;align-self:center">${view.length} projects</div>
   </div>
 
   <div style="padding:10px 16px 50px">`;
 
   if (!view.length) {
-    h += `<div style="padding:50px;text-align:center;color:var(--d-text-dim,#8b93c4);font-size:13px">
+    h += `<div style="padding:50px;text-align:center;color:#999;font-size:13px">
       No projects with LPOs match. Projects appear here once the Coordinator adds an LPO.</div>`;
   }
 
@@ -135,7 +179,7 @@ function renderPayments() {
       </div>
       <div class="pay-figures">
         <div><span class="pay-fl">Raised</span><span class="pay-fv">${fmtAED(r.raised)}</span><span class="pay-fc">${r.count} LPO${r.count!==1?"s":""}</span></div>
-        <div><span class="pay-fl">Credited</span><span class="pay-fv" style="color:#5fcf95">${fmtAED(r.credited)}</span><span class="pay-fc">${r.creditedCount} paid</span></div>
+        <div><span class="pay-fl">${ranged?"In Range":"Credited"}</span><span class="pay-fv" style="color:#27ae60">${fmtAED(ranged?r.rangeCredited:r.credited)}</span><span class="pay-fc">${ranged?("of "+fmtAED(r.credited)+" total"):(r.creditedCount+" paid")}</span></div>
         <div><span class="pay-fl">Pending</span><span class="pay-fv" style="color:#e3c468">${fmtAED(r.pending)}</span><span class="pay-fc">${r.collRate}% collected</span></div>
       </div>
       <div class="pay-bar"><div class="pay-bar-fill" style="width:${pct}%"></div></div>
@@ -164,7 +208,7 @@ function renderPayments() {
   });
 
   h += `</div>
-  <div class="footer">Winner Holistic Consultants · Project Payment Summary · <a href="/auth/" style="color:#888">Portal</a></div>`;
+  <div class="footer">Winner Holistic Consultants · LPO Status · <a href="/auth/" style="color:#888">Portal</a></div>`;
 
   document.getElementById("app").innerHTML = h;
   setupScrollTop();

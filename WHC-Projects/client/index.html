@@ -17,17 +17,60 @@
 <script>
 const PROJECT_ID = new URLSearchParams(window.location.search).get("id");
 
+// ── Client view with stale-while-revalidate local cache ───────
+// The client link is the most-viewed page. To minimise Firebase
+// downloads and make it feel instant, we cache the project in the
+// browser (localStorage). On open: paint the cached copy immediately
+// (0 network), then fetch the latest in the background and refresh
+// the view only if something changed. A short freshness window skips
+// the network entirely on rapid refreshes.
+const _CACHE_KEY = "whc_client_" + (PROJECT_ID || "");
+const _FRESH_MS = 60000; // 60s: within this, don't even re-fetch
+
+function _readCache() {
+  try { const raw = localStorage.getItem(_CACHE_KEY); return raw ? JSON.parse(raw) : null; }
+  catch (e) { return null; }
+}
+function _writeCache(data) {
+  try { localStorage.setItem(_CACHE_KEY, JSON.stringify({ at: Date.now(), data })); } catch (e) {}
+}
+
 async function boot() {
   if (!PROJECT_ID) {
     document.getElementById("app").innerHTML = notFoundPage("No project ID provided in the link.");
     return;
   }
-  const data = await fbGet("projects/" + PROJECT_ID);
+
+  // 1) Instant paint from cache, if present.
+  const cached = _readCache();
+  let painted = false, paintedJson = "";
+  if (cached && cached.data) {
+    paintedJson = JSON.stringify(cached.data);
+    renderClient(migrateProject(cached.data));
+    painted = true;
+    // Fresh enough → skip the network completely.
+    if (Date.now() - (cached.at || 0) < _FRESH_MS) return;
+  }
+
+  // 2) Revalidate in the background (or foreground if nothing cached).
+  let data = null;
+  try {
+    // Bypass the in-memory TTL cache; we manage freshness ourselves.
+    data = await fbGet("projects/" + PROJECT_ID, { fresh: true });
+  } catch (e) { data = null; }
+
   if (!data) {
+    // Network failed but we already showed cached content → keep it.
+    if (painted) return;
     document.getElementById("app").innerHTML = notFoundPage("This link may be invalid or the project was deleted.");
     return;
   }
-  renderClient(migrateProject(data));
+
+  _writeCache(data);
+  // Only re-render if the data actually changed (avoids a flicker).
+  if (!painted || JSON.stringify(data) !== paintedJson) {
+    renderClient(migrateProject(data));
+  }
 }
 
 function notFoundPage(msg) {

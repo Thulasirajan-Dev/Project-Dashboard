@@ -62,3 +62,22 @@
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+
+# ── Caching: let browsers cache JS/CSS so repeat visits don't
+#    re-download them (saves Netlify bandwidth). HTML stays uncached
+#    so deploys take effect immediately. Firebase data is never cached
+#    here — it's fetched live by the app.
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=3600, must-revalidate"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=3600, must-revalidate"
+
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

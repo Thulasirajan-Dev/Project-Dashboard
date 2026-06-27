@@ -406,195 +406,108 @@ input,select,button,textarea{font-family:inherit}
 .scroll-top-btn{position:fixed;bottom:24px;right:18px;width:38px;height:38px;border-radius:50%;background:#c9a752;color:#0d2137;border:none;font-size:20px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.18);display:none;align-items:center;justify-content:center;z-index:998;transition:opacity 0.2s}
 .scroll-top-btn.visible{display:flex}
 
-/* ============================================================
-   DARK THEME — Slate blue-grey + gold
-   Appended override. Later rules win via the cascade, so this
-   recolors the app without editing the rules above. Meaningful
-   status colors (green/red/amber chips) are intentionally left
-   alone so they still read as approved / rejected / hold etc.
-   ============================================================ */
-:root{
-  --d-bg:#222748;          /* app background — indigo / blue-violet, lighter */
-  --d-surface:#2e3560;     /* cards / panels        */
-  --d-surface-2:#3a4275;   /* nested / hover        */
-  --d-line:#474f86;        /* borders               */
-  --d-text:#eef0fb;        /* primary text          */
-  --d-text-soft:#b9c0e6;   /* secondary text        */
-  --d-text-dim:#8b93c4;    /* tertiary / labels     */
-  --d-gold:#e3c468;        /* accent                */
-  --d-gold-soft:#f3da8c;
-  --d-shadow:0 10px 30px rgba(20,16,50,0.45);
-  --d-shadow-sm:0 4px 14px rgba(20,16,50,0.35);
-}
-
-body, #app{ background:var(--d-bg); color:var(--d-text); }
-
-/* ── Generic surfaces ── */
-.topbar,.tabs,.coord-search-bar,.search-bar,.admin-nav-tabs,.footer,
-.dc,.sbox,.dash-card,.kpi-card,.proj-row,.milestone-label,.modal,
-.admin-popup,.login-box,.coord-name-box,.rte-wrap,.prop-card{
-  background:var(--d-surface); color:var(--d-text);
-  border-color:var(--d-line);
-}
-.dch,.deg,.se,.deg-h,.btn-add,.pipeline-proj-row,.prop-filters,
-.rte-toolbar,.rte-editor,.coord-thead{
-  background:var(--d-surface-2); color:var(--d-text);
-  border-color:var(--d-line);
-}
-.footer{ border-top-color:var(--d-line); color:var(--d-text-dim); }
-
-/* ── Text recolor ── */
-.sname,.act-stage,.proj-row-title,.modal h3,.milestone-value,
-.dash-card-title,.coord-name,.proj-pct,.kpi-num{ color:var(--d-text); }
-.snote,.act-detail,.modal p,.proj-row-meta,.bar-label,.attn-proj,
-.dr,.die-n,.se-note,.prop-card-meta{ color:var(--d-text-soft); }
-.sec-label,.dash-card-title,.landing-section-label,.sbox-title,
-.kpi-label,.milestone-title,.act-time,.dash-empty{ color:var(--d-text-dim); }
-
-/* ── Tabs ── */
-.tab{ color:var(--d-text-soft); }
-.tab.on,.admin-nav-tab.on{ color:var(--d-gold); border-bottom-color:var(--d-gold); }
-.admin-nav-tab{ color:var(--d-text-soft); }
-.admin-nav-tabs{ border-bottom-color:var(--d-line); }
-
-/* ── Form fields ── */
-.fi,.se-ni,.se-sel,.se-note,.die-n,.die-sel,.coord-search-input,
-.coord-filter-sel,.search-input,.filter-sel,.deg-name,.scope-details-fi,
-.se-date-fi,.prop-filter-input,.rte-select{
-  background:var(--d-surface-2); color:var(--d-text);
-  border-color:var(--d-line);
-}
-.fi::placeholder,.search-input::placeholder,.coord-search-input::placeholder{ color:var(--d-text-dim); }
-.fl,.prop-filter-label{ color:var(--d-text-soft); }
-.fi:focus{ border-color:var(--d-gold); box-shadow:0 0 0 3px rgba(214,183,94,0.15); }
-
-/* ── Rich tile / card shadows (the requested look) ── */
-.kpi-card,.proj-row,.dash-card,.sbox,.prop-card,.milestone-label,
-.dc,.login-box,.coord-name-box{ box-shadow:var(--d-shadow-sm); }
-.kpi-card:hover,.proj-row:hover{
-  box-shadow:var(--d-shadow); transform:translateY(-3px);
-  border-color:var(--d-gold);
-}
-.dc:hover,.sbox:hover{ box-shadow:var(--d-shadow); }
-
-/* ── Misc surfaces that were light ── */
-.se-num{ background:#0b1118; }
-.btn-add{ border-color:var(--d-line); color:var(--d-text-soft); }
-.btn-add:hover{ background:var(--d-surface-2); border-color:var(--d-gold); color:var(--d-gold); }
-.bar-track,.mini-bar-bg{ background:var(--d-surface-2); }
-.pipeline-pill{ background:var(--d-surface-2); border-color:var(--d-line); color:var(--d-text-soft); }
-.coord-row,.attn-row,.act-row,.prop-act-row{ border-bottom-color:var(--d-line); }
-.coord-row:hover,.attn-row:hover,.bar-row:hover,.pipeline-proj-row:hover{ background:var(--d-surface-2); }
-.spinner{ border-color:var(--d-line); border-top-color:var(--d-gold); }
-.modal-large::-webkit-scrollbar-thumb{ background:var(--d-gold); }
-
-/* Login box gets a deeper lift */
-.login-box,.coord-name-box{ box-shadow:var(--d-shadow); }
-
 
 /* ============================================================
-   DARK THEME — readability fixes for hardcoded dark text
-   Many inline styles use color:#222 / #1a1a1a / #333 / #1a5276
-   which become unreadable on dark cards. Inline styles win over
-   classes, so these use attribute selectors + !important to
-   force light text where a dark inline color was set.
+   LIGHT THEME styling for the newer components
+   (LPO tab, LPO Status cards, activity log, user dashboard).
+   The base sheet above is already light; these match it with a
+   clean navy/gold accent and soft shadows.
    ============================================================ */
-.proj-row-title,.prop-card-title,.hdr-title,.dash-card-title,
-.sname,.coord-name,.modal h3{ color:#f2f5f9 !important; }
 
-/* Neutralize the common hardcoded dark inline colors → light */
-[style*="color:#222"]    { color:#dfe7f0 !important; }
-[style*="color:#1a1a1a"] { color:#f2f5f9 !important; }
-[style*="color:#333"]    { color:#cdd8e4 !important; }
-[style*="color:#1a5276"] { color:#7fb4e6 !important; }   /* dark blue → lighter blue */
-[style*="color: #222"]   { color:#dfe7f0 !important; }
-[style*="color: #1a1a1a"]{ color:#f2f5f9 !important; }
-[style*="color: #333"]   { color:#cdd8e4 !important; }
-
-/* Light-tinted info boxes (e.g. #fdf8f5, #fff8e6) become dark so
-   their dark text stays readable. Scoped to specific tints only. */
-[style*="background:#fdf8f5"],[style*="background:#fff8e6"],
-[style*="background:#f7f7f7"],[style*="background:#f9f9f9"]{ background:#3a4275 !important; }
-
-/* Keep the green money figures readable (they were #166a3f on white) */
-[style*="color:#166a3f"]{ color:#5fcf95 !important; }
-
-
-/* ============================================================
-   USER MANAGEMENT DASHBOARD (auth module) — dark indigo styling
-   These classes are emitted by auth.js but had no CSS, so the
-   page rendered unstyled. Defined here to match the theme.
-   ============================================================ */
-.auth-hdr{background:linear-gradient(135deg,#272c54,#3a4275);padding:20px 24px;color:#eef0fb;display:flex;justify-content:space-between;align-items:flex-start;gap:14px;border-bottom:1px solid #474f86}
-.auth-hdr .hdr-logo{font-size:12px;letter-spacing:2px;color:#e3c468;text-transform:uppercase;font-weight:600}
+/* ── User management dashboard (auth) ── */
+.auth-hdr{background:linear-gradient(135deg,#0d2137,#1a3a5c);padding:20px 24px;color:#fff;display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.auth-hdr .hdr-logo{font-size:12px;letter-spacing:2px;color:#c9a752;text-transform:uppercase;font-weight:600}
 .auth-hdr-title{font-family:'Playfair Display',serif;font-size:21px;color:#fff;margin-top:4px}
-.auth-hdr-sub{font-size:11.5px;color:rgba(255,255,255,0.6);margin-top:2px}
-
-.auth-tabs{display:flex;gap:4px;background:#272c54;padding:0 18px;border-bottom:1px solid #474f86}
-.auth-tab{padding:13px 18px;font-size:13px;font-weight:600;color:#b9c0e6;cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;user-select:none}
-.auth-tab:hover{color:#fff}
-.auth-tab.on{color:#e3c468;border-bottom-color:#e3c468}
-
+.auth-hdr-sub{font-size:11.5px;color:rgba(255,255,255,0.65);margin-top:2px}
+.auth-tabs{display:flex;gap:4px;background:#fff;padding:0 18px;border-bottom:1px solid #e8e8e8}
+.auth-tab{padding:13px 18px;font-size:13px;font-weight:600;color:#888;cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;user-select:none}
+.auth-tab:hover{color:#0d2137}
+.auth-tab.on{color:#0d2137;border-bottom-color:#c9a752}
 .auth-body{max-width:860px;margin:0 auto;padding:22px 18px 50px}
-.auth-success{max-width:860px;margin:14px auto 0;background:#1f5135;color:#9be8bb;border:1px solid #2e7a50;border-radius:9px;padding:10px 14px;font-size:13px}
-.auth-error{max-width:860px;margin:14px auto 0;background:#5a2230;color:#f3b3c0;border:1px solid #8a3349;border-radius:9px;padding:10px 14px;font-size:13px}
-
+.auth-success{max-width:860px;margin:14px auto 0;background:#e6f4ec;color:#166a3f;border:1px solid #b8e0c8;border-radius:9px;padding:10px 14px;font-size:13px}
+.auth-error{max-width:860px;margin:14px auto 0;background:#fbe9e9;color:#a32d2d;border:1px solid #f0c4c4;border-radius:9px;padding:10px 14px;font-size:13px}
 .auth-kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-bottom:20px}
-.auth-kpi{background:linear-gradient(160deg,#2e3560,#272c54);border:1px solid #474f86;border-radius:13px;padding:16px 14px;text-align:center;box-shadow:0 4px 14px rgba(20,16,50,0.35)}
-.auth-kpi-n{font-size:24px;font-weight:700;color:#eef0fb;line-height:1}
-.auth-kpi-l{font-size:10.5px;color:#8b93c4;margin-top:6px;text-transform:uppercase;letter-spacing:0.5px}
-
+.auth-kpi{background:#fff;border:1px solid #ececec;border-radius:13px;padding:16px 14px;text-align:center;box-shadow:0 2px 10px rgba(13,33,55,0.05)}
+.auth-kpi-n{font-size:24px;font-weight:700;color:#0d2137;line-height:1}
+.auth-kpi-l{font-size:10.5px;color:#999;margin-top:6px;text-transform:uppercase;letter-spacing:0.5px}
 .auth-filter-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
-
-.auth-user-card{background:linear-gradient(160deg,#2e3560,#272c54);border:1px solid #474f86;border-radius:14px;padding:16px 18px;margin-bottom:12px;box-shadow:0 4px 14px rgba(20,16,50,0.3);transition:all 0.15s}
-.auth-user-card:hover{box-shadow:0 10px 28px rgba(20,16,50,0.5);border-color:#5b63a5}
+.auth-user-card{background:#fff;border:1px solid #ececec;border-radius:14px;padding:16px 18px;margin-bottom:12px;box-shadow:0 2px 10px rgba(13,33,55,0.05);transition:all 0.15s}
+.auth-user-card:hover{box-shadow:0 8px 22px rgba(13,33,55,0.1);border-color:#d8d8d8}
 .auth-user-inactive{opacity:0.6}
 .auth-user-top{display:flex;gap:14px;align-items:flex-start}
-.auth-user-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#e3c468,#caa84a);color:#272c54;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0}
-.auth-user-name{font-size:15px;font-weight:700;color:#f3f4fd;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-.auth-user-email{font-size:12px;color:#b9c0e6;margin-top:2px}
-.auth-you-badge{background:#e3c468;color:#272c54;font-size:10px;font-weight:700;padding:1px 8px;border-radius:8px}
-.auth-inactive-badge{background:#5a2230;color:#f3b3c0;font-size:10px;font-weight:600;padding:1px 8px;border-radius:8px}
+.auth-user-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#c9a752,#b8943f);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0}
+.auth-user-name{font-size:15px;font-weight:700;color:#0d2137;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.auth-user-email{font-size:12px;color:#888;margin-top:2px}
+.auth-you-badge{background:#c9a752;color:#fff;font-size:10px;font-weight:700;padding:1px 8px;border-radius:8px}
+.auth-inactive-badge{background:#fbe9e9;color:#a32d2d;font-size:10px;font-weight:600;padding:1px 8px;border-radius:8px}
 
-/* Make the access pills readable on the dark cards */
-.auth-user-card [style*="background:#eef0fb"]{ background:#3a4275 !important; color:#e3c468 !important; }
-/* Reset the inline light text inside auth cards handled by global rules above */
-
-
-/* ── LPO / Payments tab ── */
-.lpo-kpi{background:linear-gradient(160deg,#2e3560,#272c54);border:1px solid #474f86;border-radius:11px;padding:12px;text-align:center}
-.lpo-kpi-n{font-size:17px;font-weight:700;color:#eef0fb}
-.lpo-kpi-l{font-size:10px;color:#8b93c4;margin-top:4px;text-transform:uppercase;letter-spacing:0.4px}
-.lpo-card{background:#2e3560;border:1px solid #474f86;border-radius:12px;padding:14px;margin-bottom:12px}
+/* ── LPO tab (inside project editor) ── */
+.lpo-kpi{background:#f8f9fb;border:1px solid #e8e8e8;border-radius:11px;padding:12px;text-align:center}
+.lpo-kpi-n{font-size:17px;font-weight:700;color:#0d2137}
+.lpo-kpi-l{font-size:10px;color:#999;margin-top:4px;text-transform:uppercase;letter-spacing:0.4px}
+.lpo-card{background:#fff;border:1px solid #e8e8e8;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 6px rgba(13,33,55,0.04)}
 .lpo-card.lpo-credited{border-left:4px solid #27ae60}
 .lpo-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
 .lpo-field{flex:1;min-width:120px}
 .lpo-foot{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
-.lpo-meta{font-size:11px;color:#8b93c4}
+.lpo-meta{font-size:11px;color:#999}
 
-
-/* ── Project Payment Summary (payments module) ── */
-.pay-card{background:linear-gradient(160deg,#2e3560,#272c54);border:1px solid #474f86;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 4px 14px rgba(20,16,50,0.3)}
+/* ── LPO Status cards (payments module) ── */
+.pay-card{background:#fff;border:1px solid #e8e8e8;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(13,33,55,0.05)}
 .pay-card-top{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px}
-.pay-title{font-size:15px;font-weight:700;color:#f2f5f9}
-.pay-sub{font-size:11.5px;color:#b9c0e6;margin-top:2px}
+.pay-title{font-size:15px;font-weight:700;color:#0d2137}
+.pay-sub{font-size:11.5px;color:#888;margin-top:2px}
 .pay-status{font-size:11px;font-weight:700;padding:3px 11px;border-radius:10px;flex-shrink:0;white-space:nowrap}
 .pay-figures{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px}
-.pay-figures > div{background:#272c54;border-radius:9px;padding:9px 11px;display:flex;flex-direction:column}
-.pay-fl{font-size:9.5px;color:#8b93c4;text-transform:uppercase;letter-spacing:0.5px}
-.pay-fv{font-size:16px;font-weight:700;color:#eef0fb;margin-top:2px}
-.pay-fc{font-size:10px;color:#8b93c4;margin-top:1px}
-.pay-bar{height:7px;background:#272c54;border-radius:5px;overflow:hidden;margin-bottom:10px}
-.pay-bar-fill{height:100%;background:linear-gradient(90deg,#5fcf95,#27ae60);border-radius:5px;transition:width 0.3s}
+.pay-figures > div{background:#f8f9fb;border:1px solid #eee;border-radius:9px;padding:9px 11px;display:flex;flex-direction:column}
+.pay-fl{font-size:9.5px;color:#999;text-transform:uppercase;letter-spacing:0.5px}
+.pay-fv{font-size:16px;font-weight:700;color:#0d2137;margin-top:2px}
+.pay-fc{font-size:10px;color:#aaa;margin-top:1px}
+.pay-bar{height:7px;background:#eef0f3;border-radius:5px;overflow:hidden;margin-bottom:10px}
+.pay-bar-fill{height:100%;background:linear-gradient(90deg,#34c77b,#27ae60);border-radius:5px;transition:width 0.3s}
 .pay-details{font-size:12px}
-.pay-details summary{cursor:pointer;color:#e3c468;font-size:12px;font-weight:600;padding:4px 0;user-select:none}
+.pay-details summary{cursor:pointer;color:#a07c1f;font-size:12px;font-weight:600;padding:4px 0;user-select:none}
 .pay-lpo-list{margin-top:8px}
-.pay-lpo-row{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #3a4275}
+.pay-lpo-row{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0}
 .pay-lpo-row:last-child{border-bottom:none}
-.pay-lpo-name{font-size:13px;color:#eef0fb;font-weight:600}
-.pay-lpo-meta{font-size:10.5px;color:#8b93c4;margin-top:2px}
-.pay-lpo-amt{font-size:14px;font-weight:700;color:#eef0fb}
+.pay-lpo-name{font-size:13px;color:#0d2137;font-weight:600}
+.pay-lpo-meta{font-size:10.5px;color:#999;margin-top:2px}
+.pay-lpo-amt{font-size:14px;font-weight:700;color:#0d2137}
 .pay-lpo-chip{font-size:9.5px;font-weight:700;padding:1px 8px;border-radius:7px;display:inline-block;margin-top:3px}
 .pay-card-foot{margin-top:10px;text-align:right}
-.pay-open{font-size:11.5px;color:#e3c468;text-decoration:none;font-weight:600}
+.pay-open{font-size:11.5px;color:#a07c1f;text-decoration:none;font-weight:600}
 .pay-open:hover{text-decoration:underline}
+
+/* ── Activity log overlay (light) ── */
+#whc-actlog-overlay{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;font-family:'DM Sans',system-ui,sans-serif}
+.actlog-backdrop{position:absolute;inset:0;background:rgba(13,33,55,0.4);backdrop-filter:blur(3px)}
+.actlog-panel{position:relative;width:min(680px,94vw);max-height:88vh;display:flex;flex-direction:column;background:#fff;border:1px solid #e8e8e8;border-radius:16px;box-shadow:0 24px 60px rgba(13,33,55,0.3);overflow:hidden}
+.actlog-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:18px 20px;background:linear-gradient(135deg,#0d2137,#1a3a5c);border-bottom:1px solid #e8e8e8}
+.actlog-title{font-size:17px;font-weight:700;color:#fff}
+.actlog-sub{font-size:11px;color:rgba(255,255,255,0.7);margin-top:2px}
+.actlog-close{background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:8px;width:30px;height:30px;font-size:14px;cursor:pointer}
+.actlog-close:hover{background:rgba(255,255,255,0.28)}
+.actlog-filters{display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid #eee;background:#fafafa}
+.actlog-sel,.actlog-search{background:#fff;color:#0d2137;border:1px solid #ddd;border-radius:8px;padding:8px 10px;font-size:12px;font-family:inherit}
+.actlog-search{flex:1}
+.actlog-sel:focus,.actlog-search:focus{outline:none;border-color:#c9a752}
+.actlog-refresh{background:#c9a752;color:#fff;border:none;border-radius:8px;width:36px;font-size:14px;font-weight:700;cursor:pointer}
+.actlog-body{overflow-y:auto;padding:6px 10px 14px}
+.actlog-loading,.actlog-empty{padding:40px;text-align:center;color:#aaa;font-size:13px}
+.actlog-row{display:flex;gap:11px;align-items:flex-start;padding:11px 10px;border-bottom:1px solid #f2f2f2}
+.actlog-row:last-child{border-bottom:none}
+.actlog-dot{width:9px;height:9px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.actlog-main{flex:1;min-width:0}
+.actlog-line{font-size:13px;color:#0d2137}
+.actlog-meta{font-size:11px;color:#888;margin-top:3px}
+.actlog-modpill{padding:1px 7px;border-radius:7px;font-weight:600;margin-right:3px}
+.actlog-tag{font-size:9px;font-weight:700;padding:1px 6px;border-radius:6px;margin-left:6px;vertical-align:middle}
+.actlog-tag-edit{background:#f3ecd8;color:#a07c1f}
+.actlog-time{font-size:10.5px;color:#aaa;white-space:nowrap;flex-shrink:0;margin-top:2px}
+
+/* ── Date range bar (LPO Status & Summary) ── */
+.range-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 18px;background:#fff;border-bottom:1px solid #eee}
+.range-lbl{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
+.range-input{border:1px solid #ddd;border-radius:8px;padding:7px 10px;font-size:12px;font-family:inherit;color:#0d2137}
+.range-input:focus{outline:none;border-color:#c9a752}
+.range-now{margin-left:auto;font-size:12px;color:#0d2137;font-weight:600;background:#f3ecd8;padding:4px 12px;border-radius:8px}

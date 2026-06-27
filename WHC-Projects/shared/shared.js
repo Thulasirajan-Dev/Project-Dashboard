@@ -6,15 +6,79 @@
 // ── Firebase helpers ─────────────────────────────────────────
 const DB = FIREBASE_URL.replace(/\/$/, "");
 
-async function fbGet(path) {
-  try { const r = await fetch(`${DB}/${path}.json`); return r.ok ? r.json() : null; } catch (e) { return null; }
+// ── Firebase REST helpers with a tiny in-memory read cache ──────
+// The cache cuts redundant downloads of large collections when the
+// user navigates between tabs/pages within a session. Short TTL keeps
+// data fresh; any write to a path invalidates its cached copy.
+const _fbCache = new Map();          // path -> { t: timestamp, v: value }
+const _FB_TTL = 15000;               // 15s; tune as needed
+
+function _fbInvalidate(path) {
+  // Invalidate the path and any parent collection (e.g. writing
+  // projects/x clears the cached "projects" too).
+  const top = String(path).split("/")[0];
+  for (const k of _fbCache.keys()) {
+    if (k === path || k === top || k.startsWith(top + "/") || k.startsWith(top + ".")) _fbCache.delete(k);
+  }
+}
+
+async function fbGet(path, opts) {
+  const noCache = opts && opts.fresh;
+  if (!noCache) {
+    const hit = _fbCache.get(path);
+    if (hit && (Date.now() - hit.t) < _FB_TTL) return hit.v;
+  }
+  try {
+    const r = await fetch(`${DB}/${path}.json`);
+    const v = r.ok ? await r.json() : null;
+    _fbCache.set(path, { t: Date.now(), v });
+    return v;
+  } catch (e) { return null; }
 }
 async function fbSet(path, data) {
-  try { const r = await fetch(`${DB}/${path}.json`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); return r.ok; } catch (e) { return false; }
+  try {
+    const r = await fetch(`${DB}/${path}.json`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+    _fbInvalidate(path);
+    return r.ok;
+  } catch (e) { return false; }
 }
 async function fbDelete(path) {
-  try { const r = await fetch(`${DB}/${path}.json`, { method: "DELETE" }); return r.ok; } catch (e) { return false; }
+  try {
+    const r = await fetch(`${DB}/${path}.json`, { method: "DELETE" });
+    _fbInvalidate(path);
+    return r.ok;
+  } catch (e) { return false; }
 }
+
+// ── Persistent (localStorage) cache for big collections ─────────
+// Survives page reloads, unlike the in-memory _fbCache. Use for
+// heavy reads like "projects" on staff dashboards. Pattern:
+//   const projects = await fbGetCachedSWR("projects", onFresh);
+// It returns the cached value immediately (or null) and calls
+// onFresh(data) later if the server copy differs. Keeps Firebase
+// downloads low when the same user reloads/navigates.
+function _lsGet(key) { try { const r = localStorage.getItem(key); return r?JSON.parse(r):null; } catch(e){ return null; } }
+function _lsSet(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch(e){} }
+
+async function fbGetCachedSWR(path, onFresh, freshMs) {
+  const key = "whc_swr_" + path;
+  const cached = _lsGet(key);
+  const ttl = freshMs == null ? 60000 : freshMs;
+  const cachedData = cached ? cached.data : null;
+  const isFresh = cached && (Date.now() - (cached.at||0) < ttl);
+
+  // Revalidate in background unless very fresh.
+  if (!isFresh) {
+    fbGet(path, { fresh: true }).then(data => {
+      if (data == null) return;
+      const prevJson = cached ? JSON.stringify(cached.data) : "";
+      _lsSet(key, { at: Date.now(), data });
+      if (JSON.stringify(data) !== prevJson && typeof onFresh === "function") onFresh(data);
+    }).catch(()=>{});
+  }
+  return cachedData;
+}
+
 
 // ── Audit trail (shared across all modules) ──────────────────
 // stampAudit(record, isEdit): adds createdBy/createdAt or lastEditedBy/
@@ -66,8 +130,20 @@ async function logActivity(module, action, target, detail) {
 
 // Fetch recent activity entries (newest first), optionally filtered by module.
 async function getActivityLog(moduleFilter, limit) {
-  const all = await fbGet("activity_log") || {};
-  let rows = Object.values(all);
+  // Server-side limit: download only the most recent `limit` entries instead
+  // of the entire activity_log. Keys are time-ordered ("log_<timestamp>_..."),
+  // so orderBy="$key" + limitToLast gives the newest rows. This is the main
+  // bandwidth saver as the log grows.
+  const n = limit || 300;
+  let all = null;
+  try {
+    const url = `${DB}/activity_log.json?orderBy=%22%24key%22&limitToLast=${n}`;
+    const r = await fetch(url);
+    if (r.ok) all = await r.json();
+  } catch (e) { all = null; }
+  // Fallback (e.g. if indexing not enabled): plain fetch.
+  if (all === null) all = await fbGet("activity_log");
+  let rows = Object.values(all || {});
   if (moduleFilter) rows = rows.filter(r => r.module === moduleFilter);
   rows.sort((a, b) => (b.at || "").localeCompare(a.at || ""));
   return limit ? rows.slice(0, limit) : rows;

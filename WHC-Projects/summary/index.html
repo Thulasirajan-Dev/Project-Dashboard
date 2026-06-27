@@ -22,7 +22,7 @@
 <script src="../shared/shared.js"></script>
 <script src="summary-dashboard.js"></script>
 <script>
-let S = { summaryYear:new Date().getFullYear(), _summaryData:null };
+let S = { summaryYear:new Date().getFullYear(), _summaryData:null, lpoFrom:"", lpoTo:"" };
 async function boot() {
   const user = requireRole("super_admin");
   if (!user) return;
