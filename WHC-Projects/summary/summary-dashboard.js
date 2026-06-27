@@ -16,20 +16,31 @@ const CAT_COLORS = {
 
 // ── Load all quotation data from Firebase ─────────────────────
 async function loadSummaryData() {
-  const [fitout, live, id, priv, summaryCounters] = await Promise.all([
+  const [fitout, live, id, priv, summaryCounters, projects] = await Promise.all([
     fbGet("quotations/fitout"),
     fbGet("quotations/live"),
     fbGet("quotations/id"),
     fbGet("quotations/private"),
-    fbGet("summary")
+    fbGet("summary"),
+    fbGet("projects")
   ]);
+
+  // Aggregate LPO totals across all projects (raised vs credited).
+  const projList = Object.values(projects || {});
+  let lpoRaised = 0, lpoCredited = 0, lpoPending = 0, lpoCount = 0, projWithLpo = 0;
+  projList.forEach(p => {
+    const t = lpoTotals(p.lpos);
+    if (t.count > 0) projWithLpo++;
+    lpoRaised += t.raised; lpoCredited += t.credited; lpoPending += t.pending; lpoCount += t.count;
+  });
 
   return {
     "Fitout Folder": Object.values(fitout || {}),
     "Live Folder":   Object.values(live   || {}),
     "ID Folder":     Object.values(id     || {}),
     "Private Folder":Object.values(priv   || {}),
-    summaryCounters: summaryCounters || {}
+    summaryCounters: summaryCounters || {},
+    lpo: { raised: lpoRaised, credited: lpoCredited, pending: lpoPending, count: lpoCount, projects: projWithLpo }
   };
 }
 
@@ -93,6 +104,8 @@ function renderSummaryDashboard(allData, selectedYear) {
   <div class="pbar-header">
     <div class="pbar-label">📊 Summary Dashboard</div>
     <div style="display:flex;gap:7px;align-items:center">
+      <button class="btn btn-sm" style="background:rgba(227,196,104,0.25);color:#e3c468;font-weight:600"
+        onclick="openActivityLog('')">🕓 Log</button>
       <select class="fi" style="width:auto;padding:5px 10px;font-size:12px"
         onchange="S.summaryYear=parseInt(this.value);renderSummaryPage()">
         ${[2024,2025,2026,2027].map(y =>
@@ -119,6 +132,28 @@ function renderSummaryDashboard(allData, selectedYear) {
         </div>`).join("")}
     </div>
   </div>
+
+  <!-- ── Account / LPO payments strip ── -->
+  ${(() => {
+    const L = allData.lpo || { raised:0, credited:0, pending:0, count:0, projects:0 };
+    const collRate = L.raised > 0 ? Math.round((L.credited / L.raised) * 100) : 0;
+    return `<div style="padding:14px 18px;background:#fff;border-bottom:1px solid #e5e5e5">
+      <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">💳 Account · LPO Payments</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+        ${[
+          { n: "AED "+fmtMoney(L.raised),   l: `LPO Raised (${L.count})`, c: "#1a5276", icon: "🧾" },
+          { n: "AED "+fmtMoney(L.credited), l: "Credited",                c: "#166a3f", icon: "✅" },
+          { n: "AED "+fmtMoney(L.pending),  l: "Pending",                 c: "#a06b00", icon: "⏳" },
+          { n: collRate+"%",                l: "Collection Rate",         c: "#7b3fb8", icon: "📊" }
+        ].map(k => `
+          <div style="background:#f7f7f7;border-radius:10px;padding:12px;text-align:center">
+            <div style="font-size:18px;margin-bottom:4px">${k.icon}</div>
+            <div style="font-size:20px;font-weight:700;color:${k.c}">${k.n}</div>
+            <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">${k.l}</div>
+          </div>`).join("")}
+      </div>
+    </div>`;
+  })()}
 
   <div style="padding:14px 18px">
 

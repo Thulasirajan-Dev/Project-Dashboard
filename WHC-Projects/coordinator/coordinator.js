@@ -99,19 +99,25 @@ function addDrawingPrepStage() { PROJ.stages.push({ name: "New Drawing Preparati
 function addDrawingApprovalStage() { PROJ.stages.push({ name: "New Drawing Approval Stage", type: "approval_portal", status: "", note: "", time: "", appNum: "", dateA: "", dateB: "" }); render(); }
 
 // ── Save & load ───────────────────────────────────────────────
+let _projSnapshot = null;   // pristine copy taken when a project is opened (for diffing)
 async function saveProj() {
   if (!PROJ) return; S.saving = true; render();
   const isEdit = !!PROJ.createdAt;           // first save = create, later saves = edit
+  const summary = isEdit ? diffProjectSummary(_projSnapshot, PROJ) : "";
   stampAudit(PROJ, isEdit);
   const ok = await fbSet("projects/" + PROJ.id, PROJ);
-  if (ok) logActivity("Coordinator", isEdit ? "Updated project" : "Created project", PROJ.project?.title || PROJ.id, "");
+  if (ok) {
+    logActivity("Coordinator", isEdit ? "Updated project" : "Created project",
+      PROJ.project?.title || PROJ.id, summary);
+    _projSnapshot = JSON.parse(JSON.stringify(PROJ));  // reset baseline after save
+  }
   S.saving = false; S.saved = ok; render();
   setTimeout(() => { S.saved = false; render(); }, 2500);
 }
 async function openProject(id) {
   document.getElementById("app").innerHTML = `<div class="loading"><div class="spinner"></div></div>`;
   const data = await fbGet("projects/" + id);
-  if (data) { PROJ = migrateProject(data); S.authedCoord = true; S.mode = "coord"; S.tab = "stages"; render(); }
+  if (data) { PROJ = migrateProject(data); _projSnapshot = JSON.parse(JSON.stringify(PROJ)); S.authedCoord = true; S.mode = "coord"; S.tab = "stages"; render(); }
 }
 async function confirmDelete() {
   if (!PROJ) return;
@@ -233,6 +239,8 @@ function renderCoordList() {
   return `
   <div class="cbar">
     <div class="clabel">⚙ ${S.coordName ? esc(S.coordName) + " – Coordinator" : "Coordinator Mode"}</div>
+    ${(CURRENT_USER&&CURRENT_USER.role==="super_admin")?`<button class="btn btn-sm" style="background:rgba(227,196,104,0.25);color:#e3c468;font-weight:600;margin-left:auto"
+      onclick="openActivityLog('Coordinator')">🕓 Log</button>`:""}
   </div>
   <div style="background:#fff;padding:12px 18px;border-bottom:1px solid #e5e5e5">
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px">
@@ -341,6 +349,7 @@ function renderCoordEditor() {
     <div class="tab ${S.tab==="proj"?"on":""}"      onclick="S.tab='proj';render()">Project Info</div>
     <div class="tab ${S.tab==="scope"?"on":""}"     onclick="S.tab='scope';render()">Scope & Quotations</div>
     <div class="tab ${S.tab==="stages"?"on":""}"    onclick="S.tab='stages';render()">Stages</div>
+    <div class="tab ${S.tab==="lpo"?"on":""}"       onclick="S.tab='lpo';render()">💰 LPO / Payments</div>
     <div class="tab ${S.tab==="docs"?"on":""}"      onclick="S.tab='docs';render()">Documents</div>
     <div class="tab ${S.tab==="activity"?"on":""}"  onclick="S.tab='activity';render()">Activity Log</div>
   </div>
@@ -419,6 +428,10 @@ function renderCoordEditor() {
     h += `<div class="btn-add btn-add-prep" onclick="addDrawingPrepStage()">+ Add Drawing Preparation Stage</div>
     <div class="btn-add btn-add-approval" onclick="addDrawingApprovalStage()">+ Add Drawing Approval Stage</div></div>`;
 
+  // ── LPO / Payments tab ────────────────────────────────────
+  } else if (S.tab === "lpo") {
+    h += renderLpoTab();
+
   // ── Docs tab ──────────────────────────────────────────────
   } else if (S.tab === "docs") {
     h += `<div class="sbox"><div class="sbox-title">Standard Document Groups</div>`;
@@ -492,4 +505,112 @@ function renderModals() {
     </div></div>`;
   }
   return overlay;
+}
+
+// ============================================================
+//  LPO / Payments tab — shared by Coordinator & Account
+//  Role behaviour:
+//   - Proposals / Coordinator / Super Admin: can add LPOs and edit
+//     name / amount / date / invoice.
+//   - Account / Super Admin: can edit credited status, credited date,
+//     payment reference (and amounts).
+//  Everyone can view. Edits save with the rest of the project (Save button).
+// ============================================================
+function _role() { return (typeof CURRENT_USER !== "undefined" && CURRENT_USER && CURRENT_USER.role) || (getSession() && getSession().role) || ""; }
+function _canAddLpo()  { return ["coordinator","super_admin"].includes(_role()); }
+function _canCredit()  { return ["account","super_admin"].includes(_role()); }
+
+function renderLpoTab() {
+  if (!PROJ) return "";
+  if (!Array.isArray(PROJ.lpos)) PROJ.lpos = [];
+  const t = lpoTotals(PROJ.lpos);
+
+  let h = `<div class="sbox">
+    <div class="sbox-title">LPO / Milestone Payments
+      <span style="font-size:10px;font-weight:400;color:#bbb;margin-left:6px">Coordinator enters all LPOs (first = advance, as advised by Proposals) · credited status by Accounts</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:6px 0 16px">
+      <div class="lpo-kpi"><div class="lpo-kpi-n">${fmtAED(t.raised)}</div><div class="lpo-kpi-l">Total Raised (${t.count})</div></div>
+      <div class="lpo-kpi"><div class="lpo-kpi-n" style="color:#27ae60">${fmtAED(t.credited)}</div><div class="lpo-kpi-l">Credited (${t.creditedCount})</div></div>
+      <div class="lpo-kpi"><div class="lpo-kpi-n" style="color:#e0a000">${fmtAED(t.pending)}</div><div class="lpo-kpi-l">Pending</div></div>
+    </div>`;
+
+  if (!PROJ.lpos.length) {
+    h += `<div style="padding:24px;text-align:center;color:#aaa;font-size:13px">No LPOs raised yet.</div>`;
+  }
+
+  PROJ.lpos.forEach((l, i) => {
+    const credited = l.status === "credited";
+    h += `<div class="lpo-card ${credited?"lpo-credited":""}">
+      <div class="lpo-row">
+        <div class="lpo-field" style="flex:2">
+          <div class="fl">Milestone / Description</div>
+          <input class="fi" value="${esc(l.name||"")}" ${_canAddLpo()?"":"disabled"}
+            oninput="PROJ.lpos[${i}].name=this.value" placeholder="e.g. Advance, On Approval"/>
+        </div>
+        <div class="lpo-field">
+          <div class="fl">Amount (AED)</div>
+          <input class="fi" type="number" min="0" step="any" value="${esc(l.amount||0)}"
+            ${(_canAddLpo()||_canCredit())?"":"disabled"}
+            oninput="PROJ.lpos[${i}].amount=parseFloat(this.value)||0;render()"/>
+        </div>
+        <div class="lpo-field">
+          <div class="fl">Date Raised</div>
+          <input class="fi" type="date" value="${esc(l.dateRaised||"")}" ${_canAddLpo()?"":"disabled"}
+            oninput="PROJ.lpos[${i}].dateRaised=this.value"/>
+        </div>
+      </div>
+      <div class="lpo-row">
+        <div class="lpo-field">
+          <div class="fl">Invoice No.</div>
+          <input class="fi" value="${esc(l.invoiceNo||"")}" ${(_canAddLpo()||_canCredit())?"":"disabled"}
+            oninput="PROJ.lpos[${i}].invoiceNo=this.value" placeholder="INV-..."/>
+        </div>
+        <div class="lpo-field">
+          <div class="fl">Status</div>
+          <select class="fi" ${_canCredit()?"":"disabled"}
+            onchange="PROJ.lpos[${i}].status=this.value; if(this.value==='credited'&&!PROJ.lpos[${i}].creditedDate){PROJ.lpos[${i}].creditedDate=new Date().toISOString().slice(0,10);} render()">
+            <option value="pending" ${!credited?"selected":""}>⏳ Pending</option>
+            <option value="credited" ${credited?"selected":""}>✓ Credited</option>
+          </select>
+        </div>
+        <div class="lpo-field">
+          <div class="fl">Credited Date</div>
+          <input class="fi" type="date" value="${esc(l.creditedDate||"")}" ${_canCredit()?"":"disabled"}
+            oninput="PROJ.lpos[${i}].creditedDate=this.value"/>
+        </div>
+        <div class="lpo-field">
+          <div class="fl">Payment Ref</div>
+          <input class="fi" value="${esc(l.paymentRef||"")}" ${_canCredit()?"":"disabled"}
+            oninput="PROJ.lpos[${i}].paymentRef=this.value" placeholder="TT / Cheque no."/>
+        </div>
+      </div>
+      <div class="lpo-foot">
+        <span class="lpo-meta">${l.raisedBy?`Raised by ${esc(l.raisedBy)}${l.raisedByRole?` (${esc(l.raisedByRole)})`:""}`:""}</span>
+        ${_canAddLpo()||_canCredit()?`<button class="btn btn-sm btn-red" onclick="removeLpo(${i})">Remove</button>`:""}
+      </div>
+    </div>`;
+  });
+
+  if (_canAddLpo()) {
+    const isFirst = PROJ.lpos.length === 0;
+    h += `<button class="btn btn-gold" style="margin-top:12px" onclick="addLpo()">
+      + Add ${isFirst ? "First LPO (Advance)" : "LPO"}</button>`;
+  }
+  h += `<div style="margin-top:10px;font-size:11px;color:#999">Remember to press <b>Save</b> (top right) to store changes.</div>`;
+  h += `</div>`;
+  return h;
+}
+
+function addLpo() {
+  if (!_canAddLpo()) { alert("You don't have permission to add LPOs."); return; }
+  if (!Array.isArray(PROJ.lpos)) PROJ.lpos = [];
+  const seed = PROJ.lpos.length === 0 ? "Advance" : "";
+  PROJ.lpos.push(blankLPO(seed));
+  render();
+}
+function removeLpo(i) {
+  if (!confirm("Remove this LPO entry?")) return;
+  PROJ.lpos.splice(i, 1);
+  render();
 }

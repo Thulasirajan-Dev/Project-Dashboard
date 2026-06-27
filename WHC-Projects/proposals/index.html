@@ -65,6 +65,8 @@ function renderCategoryPicker() {
     <div style="display:flex;gap:7px">
       <button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:#c4b5fd"
         onclick="openTypeList('')">📂 All Quotations</button>
+      ${CURRENT_USER?.role==="super_admin"?`<button class="btn btn-sm" style="background:rgba(227,196,104,0.2);color:#e3c468;font-weight:600"
+        onclick="openActivityLog('Proposals')">🕓 Log</button>`:""}
       <button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:#ddd;font-size:11px"
         onclick="clearSession();window.location.href='/auth/'">Logout</button>
     </div>
@@ -105,11 +107,28 @@ function renderNewForm() {
 }
 
 // Reopen the current detail record in the form, pre-filled, for editing/reversal.
+// Open a quotation's detail by id (looks it up from the loaded list).
+// Avoids embedding record JSON in an onclick attribute, which broke when
+// fields contained quotes/apostrophes/HTML.
+function openDetail(id) {
+  const rec = (S._listRecords || []).find(x => x.id === id);
+  if (!rec) { S.proposalTab = "list"; render(); return; }
+  // Ensure category is set (records carry _cat from the list loader).
+  if (!rec.category && rec._cat) rec.category = rec._cat;
+  S._editingQuotation = rec;
+  S.proposalTab = "detail";
+  render();
+}
+
 function editQuotation() {
   const r = S._editingQuotation;
   if (!r) { S.proposalTab="list"; render(); return; }
+  const cat = r.category || r._cat || "";     // internal key (e.g. "Fitout Folder")
+  if (!cat) { alert("Cannot edit: this quotation has no category set."); return; }
+  r.category = cat;                            // normalise so submit can resolve the path
   S._editMode = true;
-  S._newQuotationCategory = r.category;       // internal key (e.g. "Fitout Folder")
+  S._editingQuotation = r;
+  S._newQuotationCategory = cat;
   S._newQuotationNumber   = r.qtn_number || "";
   S.proposalTab = "new_form";
   render();
@@ -183,7 +202,7 @@ function renderListPage() {
   <div style="padding:10px 18px">
     ${!filtered.length?`<div style="text-align:center;padding:40px;color:#aaa;font-size:13px">No quotations match.</div>`:""}
     ${filtered.map(r=>{const col=catColors[r._cat]||"#999";return `<div class="prop-card" style="cursor:pointer;border-left:4px solid ${col}"
-      onclick="S._editingQuotation=${JSON.stringify(r).replace(/</g,'\\u003c')};S.proposalTab='detail';render()">
+      onclick="openDetail('${r.id}')">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
         <div style="flex:1">
           <div class="prop-card-title">${esc(r.proj_name||"Unnamed")}</div>
@@ -213,7 +232,6 @@ function renderDetailPage() {
     <div class="pbar-label" style="cursor:pointer" onclick="S.proposalTab='list';render()">← ${esc(r.qtn_number)}</div>
     <div style="display:flex;gap:7px">
       <button class="btn btn-sm btn-gold" onclick="editQuotation()">✎ Edit</button>
-      <button class="btn btn-sm btn-red" onclick="deleteQuotation('${r.id}','${r.category}')">🗑 Delete</button>
     </div>
   </div>
   <div class="body">
@@ -255,9 +273,12 @@ function renderDetailPage() {
       ${(Array.isArray(r.editHistory)&&r.editHistory.length)?`
       <div style="margin-top:12px">
         <div class="fl" style="margin-bottom:6px">History</div>
-        ${r.editHistory.slice().reverse().map(h=>`<div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:5px 0;border-bottom:1px solid #f0f0f0">
-          <span><b style="color:#0d2137">${h.action==="created"?"Created":"Edited"}</b> by ${esc(h.by||"—")}${h.role?` <span style="color:#aaa">(${esc(h.role)})</span>`:""}</span>
-          <span style="color:#888;white-space:nowrap">${fmtDateTime(h.at)}</span>
+        ${r.editHistory.slice().reverse().map(h=>`<div style="padding:6px 0;border-bottom:1px solid #f0f0f0">
+          <div style="display:flex;justify-content:space-between;gap:10px;font-size:12px">
+            <span><b style="color:#0d2137">${h.action==="created"?"Created":"Edited"}</b> by ${esc(h.by||"—")}${h.role?` <span style="color:#aaa">(${esc(h.role)})</span>`:""}</span>
+            <span style="color:#888;white-space:nowrap">${fmtDateTime(h.at)}</span>
+          </div>
+          ${h.changes?`<div style="font-size:11px;color:#7a6;margin-top:2px">${esc(h.changes)}</div>`:""}
         </div>`).join("")}
       </div>`:""}
     </div>

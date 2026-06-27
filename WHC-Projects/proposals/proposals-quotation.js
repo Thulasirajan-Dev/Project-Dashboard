@@ -3,6 +3,36 @@
 // to Firebase paths. This only changes what the user sees.
 function catLabel(category){ return (category||"").replace(/\s*Folder$/,""); }
 
+// ── Field-level diff for the activity log ─────────────────────
+// Compares the previous record with the new data and returns a short
+// human-readable summary of which fields changed (using their labels).
+function diffQuotationFields(category, prev, next) {
+  if (!prev) return "";
+  let labelMap = {};
+  try {
+    (getCategoryFields(category) || []).forEach(g =>
+      (g.fields || []).forEach(f => { labelMap[f.id] = f.label || f.id; })
+    );
+  } catch (e) {}
+  const skip = new Set(["createdAt","createdBy","createdByRole","lastEditedAt",
+    "lastEditedBy","lastEditedByRole","editHistory","id","_cat","category"]);
+  const changed = [];
+  const keys = new Set([...Object.keys(prev||{}), ...Object.keys(next||{})]);
+  keys.forEach(k => {
+    if (skip.has(k)) return;
+    const a = prev[k], b = next[k];
+    const av = (a==null?"":String(a)).trim();
+    const bv = (b==null?"":String(b)).trim();
+    if (av !== bv) changed.push(labelMap[k] || k);
+  });
+  if (!changed.length) return "No field changes";
+  const shown = changed.slice(0, 6);
+  let txt = "Changed: " + shown.join(", ");
+  if (changed.length > shown.length) txt += ` +${changed.length - shown.length} more`;
+  return txt;
+}
+
+
 // ============================================================
 //  Winner Holistic Consultants – Quotation / Proposal Module
 //  proposals-quotation.js
@@ -251,7 +281,7 @@ function renderField(f, value = "") {
   } else {
     input = `<input class="fi" type="${f.type}" id="qf-${f.id}"
       value="${esc(value)}" placeholder="${esc(f.placeholder || '')}"
-      ${f.required ? 'required' : ''} ${f.type === 'number' ? 'min="0" step="any"' : ''}
+      autocomplete="off" ${f.required ? 'required' : ''} ${f.type === 'number' ? 'min="0" step="any"' : ''}
       ${f.id.startsWith("sub_") || f.id.startsWith("fee_") || f.id === "freelancer" || f.id === "total_amount"
         ? `oninput="recalcNet()"` : ""}/>`;
   }
@@ -407,7 +437,8 @@ async function submitQuotation() {
     data.lastEditedByRole = who.role || "";
     // Append to a running edit history (keep prior entries).
     const history = (prev && Array.isArray(prev.editHistory)) ? prev.editHistory.slice() : [];
-    history.push({ action: "edited", by: who.name || "Unknown", role: who.role || "", at: nowIso });
+    history.push({ action: "edited", by: who.name || "Unknown", role: who.role || "", at: nowIso,
+      changes: diffQuotationFields(category, prev, data) });
     data.editHistory = history;
   } else {
     data.createdAt     = nowIso;
@@ -425,8 +456,12 @@ async function submitQuotation() {
     // Only count NEW quotations in the monthly summary (editing must not double-count).
     if (!isEdit) await updateSummaryCounter(data);
     if (typeof logActivity === "function") {
+      const changeSummary = isEdit ? diffQuotationFields(category, prev, data) : "";
+      const detail = isEdit
+        ? (changeSummary ? `${catLabel(category)} · ${changeSummary}` : catLabel(category))
+        : catLabel(category);
       logActivity("Proposals", isEdit ? "Updated quotation" : "Created quotation",
-        data.qtn_number || data.proj_name || entryId, catLabel(category));
+        data.qtn_number || data.proj_name || entryId, detail);
     }
     alert(`✅ Quotation ${data.qtn_number} ${isEdit ? "updated" : "saved"} successfully!`);
     S._editingQuotation = null;
@@ -521,19 +556,13 @@ async function openQuotationDetail(id, category) {
   }
 }
 
-// ── Delete a quotation ────────────────────────────────────────
+// ── Delete a quotation — DISABLED ─────────────────────────────
+// Quotations/enquiries are kept permanently as history and cannot be
+// deleted. This stub remains only so any old cached page that still
+// references it fails safely instead of erroring.
 async function deleteQuotation(id, category) {
-  if (!confirm("Delete this quotation? This cannot be undone.")) return;
-  const pathMap = {
-    "Fitout Folder": "quotations/fitout",
-    "Live Folder":   "quotations/live",
-    "ID Folder":     "quotations/id",
-    "Private Folder":"quotations/private"
-  };
-  await fbDelete(`${pathMap[category]}/${id}`);
-  if (typeof logActivity === "function") logActivity("Proposals", "Deleted quotation", id, catLabel(category));
-  S._editingQuotation = null;
-  render();
+  alert("Quotations are kept as a permanent record and cannot be deleted.");
+  return;
 }
 
 // ── Entry point: called when user picks a category ────────────

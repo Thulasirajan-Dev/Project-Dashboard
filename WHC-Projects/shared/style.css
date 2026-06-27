@@ -559,3 +559,42 @@ body, #app{ background:var(--d-bg); color:var(--d-text); }
 /* Make the access pills readable on the dark cards */
 .auth-user-card [style*="background:#eef0fb"]{ background:#3a4275 !important; color:#e3c468 !important; }
 /* Reset the inline light text inside auth cards handled by global rules above */
+
+
+/* ── LPO / Payments tab ── */
+.lpo-kpi{background:linear-gradient(160deg,#2e3560,#272c54);border:1px solid #474f86;border-radius:11px;padding:12px;text-align:center}
+.lpo-kpi-n{font-size:17px;font-weight:700;color:#eef0fb}
+.lpo-kpi-l{font-size:10px;color:#8b93c4;margin-top:4px;text-transform:uppercase;letter-spacing:0.4px}
+.lpo-card{background:#2e3560;border:1px solid #474f86;border-radius:12px;padding:14px;margin-bottom:12px}
+.lpo-card.lpo-credited{border-left:4px solid #27ae60}
+.lpo-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.lpo-field{flex:1;min-width:120px}
+.lpo-foot{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
+.lpo-meta{font-size:11px;color:#8b93c4}
+
+
+/* ── Project Payment Summary (payments module) ── */
+.pay-card{background:linear-gradient(160deg,#2e3560,#272c54);border:1px solid #474f86;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 4px 14px rgba(20,16,50,0.3)}
+.pay-card-top{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px}
+.pay-title{font-size:15px;font-weight:700;color:#f2f5f9}
+.pay-sub{font-size:11.5px;color:#b9c0e6;margin-top:2px}
+.pay-status{font-size:11px;font-weight:700;padding:3px 11px;border-radius:10px;flex-shrink:0;white-space:nowrap}
+.pay-figures{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px}
+.pay-figures > div{background:#272c54;border-radius:9px;padding:9px 11px;display:flex;flex-direction:column}
+.pay-fl{font-size:9.5px;color:#8b93c4;text-transform:uppercase;letter-spacing:0.5px}
+.pay-fv{font-size:16px;font-weight:700;color:#eef0fb;margin-top:2px}
+.pay-fc{font-size:10px;color:#8b93c4;margin-top:1px}
+.pay-bar{height:7px;background:#272c54;border-radius:5px;overflow:hidden;margin-bottom:10px}
+.pay-bar-fill{height:100%;background:linear-gradient(90deg,#5fcf95,#27ae60);border-radius:5px;transition:width 0.3s}
+.pay-details{font-size:12px}
+.pay-details summary{cursor:pointer;color:#e3c468;font-size:12px;font-weight:600;padding:4px 0;user-select:none}
+.pay-lpo-list{margin-top:8px}
+.pay-lpo-row{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #3a4275}
+.pay-lpo-row:last-child{border-bottom:none}
+.pay-lpo-name{font-size:13px;color:#eef0fb;font-weight:600}
+.pay-lpo-meta{font-size:10.5px;color:#8b93c4;margin-top:2px}
+.pay-lpo-amt{font-size:14px;font-weight:700;color:#eef0fb}
+.pay-lpo-chip{font-size:9.5px;font-weight:700;padding:1px 8px;border-radius:7px;display:inline-block;margin-top:3px}
+.pay-card-foot{margin-top:10px;text-align:right}
+.pay-open{font-size:11.5px;color:#e3c468;text-decoration:none;font-weight:600}
+.pay-open:hover{text-decoration:underline}

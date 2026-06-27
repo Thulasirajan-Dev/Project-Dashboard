@@ -16,15 +16,21 @@ async function loadAll() {
 async function openProject(id) {
   document.getElementById("app").innerHTML = `<div class="loading"><div class="spinner"></div></div>`;
   const data = await fbGet("projects/" + id);
-  if (data) { PROJ = migrateProject(data); S.mode = "project"; render(); }
+  if (data) { PROJ = migrateProject(data); _projSnapshot = JSON.parse(JSON.stringify(PROJ)); S.mode = "project"; render(); }
 }
 
+let _projSnapshot = null;   // pristine copy taken when a project is opened (for diffing)
 async function saveProj() {
   if (!PROJ) return; S.saving = true; render();
   const isEdit = !!PROJ.createdAt;
+  const summary = isEdit ? diffProjectSummary(_projSnapshot, PROJ) : "";
   stampAudit(PROJ, isEdit);
   const ok = await fbSet("projects/" + PROJ.id, PROJ);
-  if (ok) logActivity("Account", isEdit ? "Updated project" : "Created project", PROJ.project?.title || PROJ.id, "");
+  if (ok) {
+    logActivity("Account", isEdit ? "Updated project" : "Created project",
+      PROJ.project?.title || PROJ.id, summary);
+    _projSnapshot = JSON.parse(JSON.stringify(PROJ));
+  }
   S.saving = false; S.saved = ok; render();
   setTimeout(() => { S.saved = false; render(); }, 2500);
 }

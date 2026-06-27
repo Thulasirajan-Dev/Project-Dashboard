@@ -52,7 +52,8 @@ const MODULES = [
   { key:"proposals",   url:"/proposals/",   icon:"📝", title:"Proposals",   desc:"Create & manage quotations",     allow:["proposals","super_admin"] },
   { key:"coordinator", url:"/coordinator/", icon:"📋", title:"Coordinator", desc:"Assigned projects & tracking",    allow:["coordinator","super_admin"] },
   { key:"summary",     url:"/summary/",     icon:"📊", title:"Summary",     desc:"Dashboard & overview",            allow:["super_admin"] },
-  { key:"account",     url:"/account/",     icon:"⚙️", title:"Account",     desc:"Admin settings & configuration",  allow:["super_admin"] },
+  { key:"account",     url:"/account/",     icon:"⚙️", title:"Account",     desc:"Projects & LPO / payment tracking",  allow:["super_admin","account"] },
+  { key:"payments",    url:"/payments/",    icon:"💳", title:"Payment Summary", desc:"Project-wise collections & pending", allow:["super_admin","account"] },
   // NOTE: The Client page (/client/?id=xxx) is intentionally a PUBLIC,
   // per-project link sent to external customers — it has no login by
   // design. It is not listed here because there is nothing to "browse":

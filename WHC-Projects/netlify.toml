@@ -46,6 +46,11 @@
   status = 200
 
 [[redirects]]
+  from = "/payments"
+  to   = "/payments/index.html"
+  status = 200
+
+[[redirects]]
   from = "/client"
   to   = "/client/index.html"
   status = 200

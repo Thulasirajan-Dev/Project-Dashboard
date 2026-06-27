@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>WHC – Admin</title>
+<title>WHC – Project Payment Summary</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap"/>
 <link rel="stylesheet" href="../shared/style.css"/>
@@ -17,42 +17,16 @@
 .back-portal-btn:hover{background:#c9a752;color:#0d2137;transform:translateX(-2px)}
 </style>
 <div id="app"><div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">Loading...</div></div></div>
-
 <script src="../shared/config.js"></script>
 <script src="../shared/shared.js"></script>
-<script src="account.js"></script>
-<script src="../coordinator/coordinator.js"></script>
+<script src="payments-summary.js"></script>
 <script>
-let ALL_PROJECTS = {}, PROJ = null, CURRENT_USER = null;
-let S = {
-  mode:"admin", adminTab:"proposals", activityModule:"all",
-  search:"", filterStatus:"all", filterType:"all",
-  filterCoord:"all", filterStage:"all", filterProjType:"all",
-  saving:false, saved:false, modal:null, adminPopup:null,
-  tab:"stages", coordName:"Admin",
-  selectedStages:[], bulkStatus:""
-};
-
+let S = { search:"", filterStatus:"all", sortBy:"pending", _rows:null };
 async function boot() {
-  CURRENT_USER = requireRole("super_admin","account");
-  if (!CURRENT_USER) return;
-  S.coordName = CURRENT_USER.name || "Admin";
-  await loadAll();
-  // Deep link: /account/?id=<projectId> opens that project directly
-  // (used by the Project Payment Summary "Open project" links).
-  try {
-    const pid = new URLSearchParams(window.location.search).get("id");
-    if (pid) await openProject(pid);
-  } catch (e) {}
+  const user = requireRole("super_admin","account");
+  if (!user) return;
+  await loadAndRenderPayments();
 }
-
-function render() {
-  const root = document.getElementById("app");
-  const overlay = renderModals();
-  if (S.mode === "project" && PROJ) { root.innerHTML = renderCoordEditor() + overlay; return; }
-  root.innerHTML = renderAdmin() + overlay;
-}
-
 boot();
 </script>
 </body>

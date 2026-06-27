@@ -7,18 +7,21 @@ const ROLES = [
   { value: "super_admin", label: "Super Admin",  desc: "Full access to all modules" },
   { value: "proposals",   label: "Proposals",    desc: "Create & manage quotations" },
   { value: "coordinator", label: "Coordinator",  desc: "Assigned projects only" },
+  { value: "account",     label: "Account",      desc: "Projects & LPO / payment tracking" },
 ];
 
 const ROLE_BADGE = {
   super_admin: "background:#FAECE7;color:#712B13",
   proposals:   "background:#EEEDFE;color:#3C3489",
   coordinator: "background:#FAEEDA;color:#633806",
+  account:     "background:#E0F0EA;color:#1c6b4a",
 };
 
 const ROLE_MODULE_URL = {
   super_admin: "/account/",
   proposals:   "/proposals/",
   coordinator: "/coordinator/",
+  account:     "/account/",
 };
 
 // What each role can access — shown on user cards so permissions are clear.
@@ -26,6 +29,7 @@ const ROLE_ACCESS = {
   super_admin: ["Proposals","Coordinator","Summary","Account","Users"],
   proposals:   ["Proposals","Client links"],
   coordinator: ["Coordinator","Client links"],
+  account:     ["Account","LPO / Payments"],
 };
 
 // ── State ─────────────────────────────────────────────────────

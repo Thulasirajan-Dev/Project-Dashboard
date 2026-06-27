@@ -26,13 +26,6 @@ function currentActor() {
   return { name: u.name || "Unknown", role: u.role || "", id: u.id || "" };
 }
 
-function fmtDateTime(iso) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (isNaN(d)) return "—";
-  return d.toLocaleString(undefined, { year:"numeric", month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" });
-}
-
 function stampAudit(record, isEdit) {
   const who = currentActor();
   const now = new Date().toISOString();
@@ -302,6 +295,7 @@ function migrateProject(p) {
   if (!p.workflowStatus) p.workflowStatus = "allocated";
   if (!p.activityLog) p.activityLog = [];
   if (!p.proposalLog) p.proposalLog = [];
+  if (!Array.isArray(p.lpos)) p.lpos = [];   // LPO / milestone payment records
   if (!p.proposal) p.proposal = { scopeHtml: "", estimatedValue: "", expectedStartDate: "", submittedBy: "", submittedAt: "", quotationNumber: "", projectTypes: [], reapprovals: [] };
   if (!p.proposal.quotationNumber) p.proposal.quotationNumber = "";
   if (!p.proposal.projectTypes) p.proposal.projectTypes = [];
@@ -429,3 +423,215 @@ window.addEventListener("scroll", () => {
   const btn = document.getElementById("scrollTopBtn");
   if (btn) btn.classList.toggle("visible", window.scrollY > 300);
 });
+
+
+// ============================================================
+//  Activity Log viewer — shared overlay, SUPER ADMIN ONLY
+//  Any module can call openActivityLog() (optionally with a module
+//  name to pre-filter). The function gates on the session role, so
+//  non-admins cannot open it even if a trigger is exposed.
+// ============================================================
+function canViewActivityLog() {
+  const u = getSession();
+  return !!(u && u.role === "super_admin");
+}
+
+async function openActivityLog(preFilterModule) {
+  if (!canViewActivityLog()) {
+    alert("Activity log is available to Super Admins only.");
+    return;
+  }
+  // Build overlay shell with a loading state
+  let ov = document.getElementById("whc-actlog-overlay");
+  if (ov) ov.remove();
+  ov = document.createElement("div");
+  ov.id = "whc-actlog-overlay";
+  ov.innerHTML = `
+    <div class="actlog-backdrop" onclick="closeActivityLog()"></div>
+    <div class="actlog-panel" role="dialog" aria-label="Activity Log">
+      <div class="actlog-head">
+        <div>
+          <div class="actlog-title">🕓 Activity Log</div>
+          <div class="actlog-sub">Who created and edited records · Super Admin view</div>
+        </div>
+        <button class="actlog-close" onclick="closeActivityLog()">✕</button>
+      </div>
+      <div class="actlog-filters">
+        <select id="actlog-module" class="actlog-sel" onchange="renderActivityRows()">
+          <option value="all">All Modules</option>
+          <option value="Proposals">Proposals</option>
+          <option value="Coordinator">Coordinator</option>
+          <option value="Account">Account</option>
+          <option value="Users">Users</option>
+        </select>
+        <input id="actlog-search" class="actlog-search" placeholder="Search name, action, target..."
+          oninput="renderActivityRows()"/>
+        <button class="actlog-refresh" onclick="reloadActivityLog()">↻</button>
+      </div>
+      <div id="actlog-body" class="actlog-body">
+        <div class="actlog-loading">Loading activity…</div>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  injectActivityLogStyles();
+  if (preFilterModule) {
+    const sel = document.getElementById("actlog-module");
+    if (sel) sel.value = preFilterModule;
+  }
+  await reloadActivityLog();
+}
+
+function closeActivityLog() {
+  const ov = document.getElementById("whc-actlog-overlay");
+  if (ov) ov.remove();
+}
+
+let _actlogRows = [];
+async function reloadActivityLog() {
+  const body = document.getElementById("actlog-body");
+  if (body) body.innerHTML = `<div class="actlog-loading">Loading activity…</div>`;
+  _actlogRows = await getActivityLog(null, 500);
+  renderActivityRows();
+}
+
+function renderActivityRows() {
+  const body = document.getElementById("actlog-body");
+  if (!body) return;
+  const mod = (document.getElementById("actlog-module")||{}).value || "all";
+  const q = ((document.getElementById("actlog-search")||{}).value || "").toLowerCase().trim();
+  const moduleColors = { Proposals:"#9b59b6", Coordinator:"#27ae60", Account:"#5b8dee", Users:"#e8a060" };
+
+  let rows = _actlogRows.slice();
+  if (mod !== "all") rows = rows.filter(r => r.module === mod);
+  if (q) rows = rows.filter(r =>
+    (r.by||"").toLowerCase().includes(q) ||
+    (r.action||"").toLowerCase().includes(q) ||
+    (r.target||"").toLowerCase().includes(q) ||
+    (r.module||"").toLowerCase().includes(q)
+  );
+
+  if (!rows.length) {
+    body.innerHTML = `<div class="actlog-empty">No activity matches.</div>`;
+    return;
+  }
+  body.innerHTML = rows.map(r => {
+    const col = moduleColors[r.module] || "#888";
+    const isEdit = /edit/i.test(r.action);
+    return `<div class="actlog-row">
+      <div class="actlog-dot" style="background:${col}"></div>
+      <div class="actlog-main">
+        <div class="actlog-line">
+          <b>${escAL(r.action||"")}</b>${r.target?` — ${escAL(r.target)}`:""}
+          ${isEdit?`<span class="actlog-tag actlog-tag-edit">edited</span>`:""}
+        </div>
+        <div class="actlog-meta">
+          <span class="actlog-modpill" style="background:${col}22;color:${col}">${escAL(r.module||"")}</span>
+          by <b>${escAL(r.by||"—")}</b>${r.role?` (${escAL(r.role)})`:""}
+          ${r.detail?` · ${escAL(r.detail)}`:""}
+        </div>
+      </div>
+      <div class="actlog-time">${fmtDateTime(r.at)}</div>
+    </div>`;
+  }).join("");
+}
+
+// Local escape (independent of module's esc())
+function escAL(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function injectActivityLogStyles() {
+  if (document.getElementById("whc-actlog-styles")) return;
+  const css = document.createElement("style");
+  css.id = "whc-actlog-styles";
+  css.textContent = `
+  #whc-actlog-overlay{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;font-family:'DM Sans',system-ui,sans-serif}
+  .actlog-backdrop{position:absolute;inset:0;background:rgba(15,13,40,0.6);backdrop-filter:blur(3px)}
+  .actlog-panel{position:relative;width:min(680px,94vw);max-height:88vh;display:flex;flex-direction:column;background:#2e3560;border:1px solid #474f86;border-radius:16px;box-shadow:0 24px 60px rgba(10,8,30,0.6);overflow:hidden}
+  .actlog-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:18px 20px;background:linear-gradient(135deg,#272c54,#3a4275);border-bottom:1px solid #474f86}
+  .actlog-title{font-size:17px;font-weight:700;color:#fff}
+  .actlog-sub{font-size:11px;color:#b9c0e6;margin-top:2px}
+  .actlog-close{background:rgba(255,255,255,0.12);color:#fff;border:none;border-radius:8px;width:30px;height:30px;font-size:14px;cursor:pointer}
+  .actlog-close:hover{background:rgba(255,255,255,0.22)}
+  .actlog-filters{display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid #474f86;background:#272c54}
+  .actlog-sel,.actlog-search{background:#3a4275;color:#eef0fb;border:1px solid #474f86;border-radius:8px;padding:8px 10px;font-size:12px;font-family:inherit}
+  .actlog-search{flex:1}
+  .actlog-sel:focus,.actlog-search:focus{outline:none;border-color:#e3c468}
+  .actlog-refresh{background:#e3c468;color:#272c54;border:none;border-radius:8px;width:36px;font-size:14px;font-weight:700;cursor:pointer}
+  .actlog-body{overflow-y:auto;padding:6px 10px 14px}
+  .actlog-loading,.actlog-empty{padding:40px;text-align:center;color:#8b93c4;font-size:13px}
+  .actlog-row{display:flex;gap:11px;align-items:flex-start;padding:11px 10px;border-bottom:1px solid #3a4275}
+  .actlog-row:last-child{border-bottom:none}
+  .actlog-dot{width:9px;height:9px;border-radius:50%;margin-top:5px;flex-shrink:0}
+  .actlog-main{flex:1;min-width:0}
+  .actlog-line{font-size:13px;color:#eef0fb}
+  .actlog-meta{font-size:11px;color:#b9c0e6;margin-top:3px}
+  .actlog-modpill{padding:1px 7px;border-radius:7px;font-weight:600;margin-right:3px}
+  .actlog-tag{font-size:9px;font-weight:700;padding:1px 6px;border-radius:6px;margin-left:6px;vertical-align:middle}
+  .actlog-tag-edit{background:#3a4275;color:#e3c468}
+  .actlog-time{font-size:10.5px;color:#8b93c4;white-space:nowrap;flex-shrink:0;margin-top:2px}
+  `;
+  document.head.appendChild(css);
+}
+
+
+// ── Lightweight project diff for the global activity log ──────
+// Projects are nested; this reports which top-level sections changed
+// plus the stage count delta, e.g. "Changed: project details, stages (+2)".
+function diffProjectSummary(prev, next) {
+  if (!prev) return "";
+  const parts = [];
+  try {
+    if (JSON.stringify(prev.project||{}) !== JSON.stringify(next.project||{})) parts.push("project details");
+    const ps = (prev.stages||[]).length, ns = (next.stages||[]).length;
+    if (JSON.stringify(prev.stages||[]) !== JSON.stringify(next.stages||[])) {
+      const delta = ns - ps;
+      parts.push("stages" + (delta!==0 ? ` (${delta>0?"+":""}${delta})` : ""));
+    }
+    if (JSON.stringify(prev.milestones||{}) !== JSON.stringify(next.milestones||{})) parts.push("milestones");
+    if ((prev.coordinator||"") !== (next.coordinator||"")) parts.push("coordinator assignment");
+  } catch(e) {}
+  return parts.length ? "Changed: " + parts.join(", ") : "Minor update";
+}
+
+
+
+// ============================================================
+//  LPO / Milestone helpers (shared across modules)
+//  A project carries p.lpos = [ {lpo}, ... ]. Each LPO:
+//    { id, name, amount, dateRaised, raisedBy, raisedByRole,
+//      invoiceNo, status:"pending"|"credited", creditedDate,
+//      paymentRef, createdAt }
+//  Project value = sum of all LPO amounts ("raised over time").
+// ============================================================
+function blankLPO(seedName) {
+  const who = (typeof currentActor === "function") ? currentActor() : { name:"", role:"" };
+  return {
+    id: "lpo_" + Date.now() + "_" + Math.random().toString(36).slice(2,6),
+    name: seedName || "",
+    amount: 0,
+    dateRaised: new Date().toISOString().slice(0,10),
+    raisedBy: who.name || "",
+    raisedByRole: who.role || "",
+    invoiceNo: "",
+    status: "pending",
+    creditedDate: "",
+    paymentRef: "",
+    createdAt: new Date().toISOString()
+  };
+}
+
+function lpoTotals(lpos) {
+  const list = Array.isArray(lpos) ? lpos : [];
+  let raised = 0, credited = 0, pending = 0, count = list.length, creditedCount = 0;
+  list.forEach(l => {
+    const amt = Number(l.amount) || 0;
+    raised += amt;
+    if (l.status === "credited") { credited += amt; creditedCount++; }
+    else pending += amt;
+  });
+  return { raised, credited, pending, count, creditedCount };
+}
+
+function fmtAED(n) {
+  const v = Number(n) || 0;
+  return "AED " + v.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
