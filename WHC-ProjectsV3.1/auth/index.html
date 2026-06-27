@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>WHC – Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap"/>
+<link rel="stylesheet" href="../shared/style.css"/>
+<style>
+/* ── Portal hub — light, polished ── */
+.portal-top{background:linear-gradient(160deg,#ff8a5c 0%,#f0653e 60%,#e0457a 120%);padding:18px 22px;color:#fff;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid rgba(255,255,255,0.1)}
+.portal-top .who{text-align:right;flex-shrink:0}
+.portal-brand{font-size:13px;letter-spacing:2px;color:#fff;text-transform:uppercase;font-weight:600}
+.portal-sub{font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px}
+.portal-wrap{max-width:760px;margin:0 auto;padding:26px 18px 60px}
+.portal-greet{font-family:'Playfair Display',serif;font-size:22px;color:#0d2137;margin-bottom:4px}
+.portal-greet-sub{font-size:12px;color:#888;margin-bottom:22px}
+.tile-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+.tile{position:relative;background:linear-gradient(160deg,#ffffff 0%,#f4f6fa 100%);border:1px solid #e4e8ef;border-radius:16px;padding:22px 18px;text-decoration:none;color:inherit;display:block;transition:transform 0.22s cubic-bezier(.2,.8,.2,1),box-shadow 0.22s,border-color 0.22s;overflow:hidden;box-shadow:0 1px 1px rgba(13,33,55,0.04),0 6px 12px rgba(13,33,55,0.08),0 14px 28px rgba(13,33,55,0.06),inset 0 1px 0 rgba(255,255,255,0.9);transform:perspective(800px) translateZ(0)}
+.tile.on{cursor:pointer}
+.tile.on::after{content:'';position:absolute;inset:0;border-radius:16px;background:radial-gradient(140px 90px at 78% 6%,rgba(240,101,62,0.16),transparent 70%);pointer-events:none;opacity:0;transition:opacity 0.22s}
+.tile.on:hover{transform:perspective(800px) translateY(-6px) rotateX(4deg) scale(1.015);box-shadow:0 2px 2px rgba(13,33,55,0.05),0 14px 24px rgba(13,33,55,0.14),0 26px 48px rgba(13,33,55,0.12),0 0 0 1px rgba(240,101,62,0.45),inset 0 1px 0 rgba(255,255,255,0.95);border-color:#f0653e}
+.tile.on:hover::after{opacity:1}
+.tile.on:active{transform:perspective(800px) translateY(-2px) scale(1.0);transition:transform 0.08s}
+.tile.locked{opacity:0.55;cursor:not-allowed;background:#f4f5f8;box-shadow:inset 0 1px 2px rgba(13,33,55,0.05);border-style:dashed;transform:none}
+.tile-ico{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:21px;margin-bottom:13px;background:linear-gradient(145deg,#ffffff,#e6ebf3);box-shadow:0 2px 5px rgba(13,33,55,0.12),inset 0 1px 0 rgba(255,255,255,0.9),inset 0 -2px 4px rgba(13,33,55,0.06)}
+.tile-title{font-size:15px;font-weight:700;color:#0d2137;display:flex;align-items:center;gap:7px}
+.tile-desc{font-size:11.5px;color:#888;margin-top:4px;line-height:1.5}
+.tile-lock{position:absolute;top:14px;right:14px;font-size:13px;color:#aaa}
+.tile-go{margin-top:14px;font-size:11px;font-weight:600;color:#fff;letter-spacing:0.3px}
+.tile.locked .tile-go{color:#aaa}
+.role-pill{display:inline-block;margin-top:2px;font-size:11px;font-weight:600;padding:2px 11px;border-radius:10px}
+
+/* ── Sunset theme for the login / first-page ── */
+body{background:#fff5ef}
+.landing-hero{background:linear-gradient(150deg,#ff8a5c 0%,#f0653e 55%,#e0457a 120%)!important}
+.landing-brand{color:#fff!important;opacity:0.95!important}
+.landing-sub{color:rgba(255,255,255,0.7)!important}
+.login-wrap{background:linear-gradient(180deg,#fff5ef 0%,#ffe9df 100%)}
+.login-box{box-shadow:0 12px 40px rgba(224,69,90,0.18)}
+.btn-gold{background:linear-gradient(135deg,#ff8a5c,#f0653e)!important;color:#fff!important;border:none!important;box-shadow:0 4px 14px rgba(224,69,90,0.3)}
+.btn-gold:hover{filter:brightness(1.05)}
+.fi:focus{border-color:#f0653e!important;box-shadow:0 0 0 3px rgba(240,101,62,0.12)!important}
+.portal-greet,.portal-wrap{}
+.portal-wrap{background:linear-gradient(180deg,#fff5ef 0%,#fbf6f3 100%)}
+
+/* Company selector on login */
+.co-select{display:flex;flex-direction:column;gap:8px}
+.co-opt{display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;
+  padding:11px 14px;border:2px solid #e8e8e8;border-radius:11px;background:#fff;cursor:pointer;
+  transition:all 0.14s;font-family:inherit;width:100%}
+.co-opt:hover{border-color:var(--co-accent)}
+.co-opt.on{border-color:var(--co-accent);background:#fff8f4;
+  box-shadow:0 3px 12px rgba(0,0,0,0.08)}
+.co-opt-name{font-size:14px;font-weight:700;color:#32325d}
+.co-opt-full{font-size:11px;color:#8898aa}
+.co-opt.on .co-opt-name{color:var(--co-accent)}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">Loading...</div></div></div>
+
+<script src="../shared/config.js"></script>
+<script src="../shared/shared.js"></script>
+<script src="auth.js"></script>
+<script>
+// ============================================================
+//  WHC Portal hub
+//  - Logs the user in once (or bootstraps the first admin)
+//  - Shows every module as a tile; permitted ones are clickable,
+//    the rest are greyed out and locked based on the user's role.
+//  - Super admins also get a "Manage Users" button (auth.js view).
+// ============================================================
+
+// Which roles may open each module (mirrors the requireRole() guards)
+const MODULES = [
+  { key:"proposals",   url:"/proposals/",   icon:"📝", title:"Proposals",   desc:"Create & manage quotations",     allow:["proposals","super_admin"] },
+  { key:"coordinator", url:"/coordinator/", icon:"📋", title:"Coordinator", desc:"Assigned projects & tracking",    allow:["coordinator","super_admin"] },
+  { key:"account",     url:"/account/",     icon:"⚙️", title:"Account",     desc:"Projects & LPO / payment tracking",  allow:["super_admin","account"] },
+  { key:"payments",    url:"/payments/",    icon:"💳", title:"LPO Status",  desc:"Project-wise collections & pending", allow:["super_admin","account"] },
+  { key:"summary",     url:"/summary/",     icon:"📊", title:"Summary",     desc:"Dashboard & overview",            allow:["super_admin"] },
+  // NOTE: The Client page (/client/?id=xxx) is intentionally a PUBLIC,
+  // per-project link sent to external customers — it has no login by
+  // design. It is not listed here because there is nothing to "browse":
+  // opening /client/ without a project id shows an empty page. Staff
+  // generate client links from inside the Proposals / Coordinator modules.
+];
+
+const ROLE_LABEL = {
+  super_admin: { label:"Super Admin", style:"background:#FAECE7;color:#712B13" },
+  proposals:   { label:"Proposals",   style:"background:#EEEDFE;color:#3C3489" },
+  coordinator: { label:"Coordinator", style:"background:#FAEEDA;color:#633806" },
+};
+
+function canAccess(user, mod){ return user && mod.allow.includes(user.role); }
+
+// ── Boot ──────────────────────────────────────────────────────
+async function boot() {
+  mountViewToggle();
+  const session = getSession();
+  if (session) { renderHub(session); return; }
+
+  const existing = await fbGet("users");
+  const hasUsers = existing && Object.keys(existing).length > 0;
+  if (!hasUsers) { renderBootstrap(); return; }
+
+  renderLoginPage();
+}
+
+// ── The hub (after login) ─────────────────────────────────────
+function renderHub(user) {
+  const roleMeta = ROLE_LABEL[user.role] || { label:user.role, style:"background:#f0f0f0;color:#555" };
+
+  const tiles = MODULES.map(mod => {
+    const ok = canAccess(user, mod);
+    if (ok) {
+      return `<a class="tile on" href="${mod.url}">
+        <div class="tile-ico">${mod.icon}</div>
+        <div class="tile-title">${mod.title}</div>
+        <div class="tile-desc">${mod.desc}</div>
+        <div class="tile-go">Open →</div>
+      </a>`;
+    }
+    return `<div class="tile locked" title="You don't have access to this module">
+      <span class="tile-lock">🔒</span>
+      <div class="tile-ico">${mod.icon}</div>
+      <div class="tile-title">${mod.title}</div>
+      <div class="tile-desc">${mod.desc}</div>
+      <div class="tile-go">Locked</div>
+    </div>`;
+  }).join("");
+
+  const manageBtn = user.role === "super_admin"
+    ? `<button class="btn btn-out" style="font-size:11px" onclick="loadUsers()">Manage Users</button>` : "";
+
+  document.getElementById("app").innerHTML = `
+  <div class="portal-top">
+    <div>
+      <div class="portal-brand">Winner Holistic Consultants</div>
+      <div class="portal-sub">Project Portal</div>
+    </div>
+    <div class="who">
+      <div style="font-size:11px;color:rgba(255,255,255,0.5)">Signed in as</div>
+      <div style="font-size:13px;font-weight:600;color:#fff">${esc(user.name || "User")}</div>
+      <span class="role-pill" style="${roleMeta.style}">${roleMeta.label}</span>
+    </div>
+  </div>
+  <div class="portal-wrap">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;gap:10px;flex-wrap:wrap">
+      <div>
+        <div class="portal-greet">Welcome${user.name ? ", " + esc(user.name.split(" ")[0]) : ""}</div>
+        <div class="portal-greet-sub">Choose a module below. Locked tiles are outside your access.</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        ${manageBtn}
+        <button class="btn btn-red" style="font-size:11px" onclick="clearSession();window.location.reload()">Logout</button>
+      </div>
+    </div>
+    <div class="tile-grid">${tiles}</div>
+  </div>`;
+}
+
+// ── First-time bootstrap ──────────────────────────────────────
+function renderBootstrap() {
+  document.getElementById("app").innerHTML = `
+  <div class="landing-hero">
+    <div class="landing-brand">Winner Holistic Consultants</div>
+    <div class="landing-title">First-time Setup</div>
+    <div class="landing-sub">Create your Super Admin account</div>
+  </div>
+  <div class="login-wrap" style="padding-top:28px"><div class="login-box">
+    <div style="font-size:12px;color:#888;margin-bottom:16px;line-height:1.6">
+      No users found. Enter the bootstrap password to create the first Super Admin account.
+    </div>
+    <div class="fl">Bootstrap password</div>
+    <input class="fi" type="password" id="bs-pw" placeholder="Admin bootstrap password" style="margin-bottom:10px"/>
+    <div class="fl">Your name</div>
+    <input class="fi" id="bs-name" placeholder="e.g. Karthik" style="margin-bottom:10px"/>
+    <div class="fl">Your email</div>
+    <input class="fi" id="bs-email" type="email" placeholder="admin@whc.ae" style="margin-bottom:10px"/>
+    <div class="fl">Set your PIN</div>
+    <input class="fi" id="bs-pin" type="password" placeholder="Min 4 characters" style="margin-bottom:10px"/>
+    <div class="fl">Confirm PIN</div>
+    <input class="fi" id="bs-pin2" type="password" placeholder="Repeat PIN" style="margin-bottom:14px"
+      onkeydown="if(event.key==='Enter')submitBootstrap()"/>
+    <div id="bs-err" style="color:#a32d2d;font-size:12px;margin-bottom:8px"></div>
+    <button class="btn btn-gold" style="width:100%;padding:11px;font-size:13px" onclick="submitBootstrap()">
+      Create Super Admin ${svgIcon('arrow-right',14,'#fff')}
+    </button>
+  </div></div>`;
+}
+
+let _bootstrapBusy = false;   // prevents rapid double-clicks creating duplicates
+async function submitBootstrap() {
+  if (_bootstrapBusy) return;
+  const pw   = document.getElementById("bs-pw")?.value || "";
+  const name = document.getElementById("bs-name")?.value.trim() || "";
+  const email= document.getElementById("bs-email")?.value.trim() || "";
+  const pin  = document.getElementById("bs-pin")?.value.trim() || "";
+  const pin2 = document.getElementById("bs-pin2")?.value.trim() || "";
+  const errEl = document.getElementById("bs-err");
+  const btn = document.querySelector('button[onclick="submitBootstrap()"]');
+
+  if (pw !== SUPER_ADMIN_BOOTSTRAP_PW) { errEl.textContent = "Incorrect bootstrap password."; return; }
+  if (!name) { errEl.textContent = "Name is required."; return; }
+  if (!pin || pin.length < 4) { errEl.textContent = "PIN must be at least 4 characters."; return; }
+  if (pin !== pin2) { errEl.textContent = "PINs do not match."; return; }
+
+  _bootstrapBusy = true;
+  if (btn) { btn.disabled = true; btn.textContent = "Creating..."; }
+  errEl.textContent = "";
+
+  // Re-check the DB right before writing: if any user now exists, abort
+  // (covers a second tab/click that already created the first admin).
+  const existingNow = await fbGet("users");
+  if (existingNow && Object.keys(existingNow).length > 0) {
+    errEl.textContent = "An account already exists. Please log in instead.";
+    _bootstrapBusy = false;
+    renderLoginPage("An account already exists — please log in.");
+    return;
+  }
+
+  const hashed = await hashPin(pin);
+  const id = makeUserId();
+  const user = { id, name, email, role: "super_admin", pin: hashed, active: true, createdAt: new Date().toISOString(), assignedProjects: [] };
+  const ok = await fbSet(`users/${id}`, user);
+  if (ok) {
+    setSession(user);
+    if (typeof logActivity === "function") logActivity("Users", "Super admin created", name, "Bootstrap setup");
+    renderHub(user);
+  } else {
+    errEl.textContent = "Failed to save. Check Firebase connection.";
+    _bootstrapBusy = false;
+    if (btn) { btn.disabled = false; btn.textContent = "Create Super Admin →"; }
+  }
+}
+
+// ── Login page ────────────────────────────────────────────────
+function renderLoginPage(errMsg) {
+  const sel = (typeof getCompany==="function") ? getCompany().id : "whc";
+  document.getElementById("app").innerHTML = `
+  <div class="landing-hero">
+    <div class="landing-brand">Winner Group</div>
+    <div class="landing-title">Team Login</div>
+    <div class="landing-sub">Select your company, then enter your name and PIN</div>
+  </div>
+  <div class="login-wrap" style="padding-top:28px"><div class="login-box">
+    ${errMsg ? `<div class="err-msg">${esc(errMsg)}</div>` : ""}
+    <div class="fl" style="margin-bottom:6px">Company</div>
+    <select class="fi" id="lg-company" style="margin-bottom:14px" onchange="pickCompany(this.value)">
+      ${COMPANIES.map(c => `<option value="${c.id}" ${c.id===sel?"selected":""}>${esc(c.name)}</option>`).join("")}
+    </select>
+    <div class="fl" style="margin-bottom:6px">Name or Email</div>
+    <input class="fi" id="lg-name" placeholder="Your name or email" style="margin-bottom:10px"
+      autocomplete="username"/>
+    <div class="fl" style="margin-bottom:6px">PIN</div>
+    <input class="fi" id="lg-pin" type="password" placeholder="Your PIN" style="margin-bottom:16px"
+      autocomplete="current-password" onkeydown="if(event.key==='Enter')submitLogin()"/>
+    <button class="btn btn-gold" style="width:100%;padding:11px;font-size:13px" onclick="submitLogin()">
+      Login ${svgIcon('arrow-right',14,'#fff')}
+    </button>
+    <div style="text-align:center;margin-top:14px;font-size:11px;color:#aaa">
+      Forgot your PIN? Contact your Super Admin.
+    </div>
+  </div></div>`;
+}
+
+function pickCompany(id) {
+  setCompany(id);
+}
+
+async function submitLogin() {
+  const nameOrEmail = document.getElementById("lg-name")?.value.trim() || "";
+  const pin = document.getElementById("lg-pin")?.value.trim() || "";
+  // Lock in whichever company the dropdown currently shows.
+  const co = document.getElementById("lg-company")?.value;
+  if (co) setCompany(co);
+  if (!nameOrEmail || !pin) { renderLoginPage("Please enter your name and PIN."); return; }
+
+  document.getElementById("app").innerHTML = `<div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">Verifying...</div></div>`;
+
+  const user = await loginWithPin(nameOrEmail, pin);
+  if (!user) { renderLoginPage("Incorrect name or PIN. Please try again."); return; }
+
+  // Everyone lands on the hub; tiles unlock based on role.
+  renderHub(user);
+}
+
+boot();
+</script>
+</body>
+</html>
