@@ -1,0 +1,41 @@
+# ============================================================
+#  Winner Holistic Consultants – Apache config for cPanel
+#  Replaces netlify.toml (redirects, headers, caching).
+#  Place this file at the web root (public_html/.htaccess).
+# ============================================================
+
+RewriteEngine On
+
+# ── Root landing page → /auth/ (301, browser URL becomes /auth/) ──
+RewriteRule ^$ /auth/ [R=301,L]
+
+# ── Bare module paths → that module's index.html ──────────────
+# Equivalent to Netlify's status=200 rewrites. We only rewrite the
+# bare folder name; real files (JS/CSS) inside each folder are served
+# directly because of the conditions below.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(auth|proposals|coordinator|account|summary|payments|client)/?$ /$1/index.html [L]
+
+# ── Security headers (was [[headers]] in netlify.toml) ────────
+<IfModule mod_headers.c>
+  Header always set X-Frame-Options "DENY"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# ── Caching: JS/CSS cached 1h, HTML never cached ──────────────
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|css)$">
+    Header set Cache-Control "public, max-age=3600, must-revalidate"
+  </FilesMatch>
+  <FilesMatch "\.html$">
+    Header set Cache-Control "public, max-age=0, must-revalidate"
+  </FilesMatch>
+</IfModule>
+
+# ── Force HTTPS ───────────────────────────────────────────────
+# TEMPORARILY DISABLED for HTTP testing (no valid SSL yet).
+# RE-ENABLE these two lines once GoDaddy SSL is installed:
+# RewriteCond %{HTTPS} off
+# RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]

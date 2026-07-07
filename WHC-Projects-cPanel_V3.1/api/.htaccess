@@ -1,0 +1,17 @@
+# ============================================================
+#  Protect the /api folder
+#  Place at: public_html/api/.htaccess
+#  Blocks any secret/config PHP from being downloaded over the web.
+#  The API scripts still include() them server-side.
+# ============================================================
+
+# Block secret + DB config files
+<FilesMatch "(config\.secret|db\.config)\.php$">
+  Require all denied
+</FilesMatch>
+<FilesMatch "\.(secret|config)\.php$">
+  Require all denied
+</FilesMatch>
+
+# Block direct browsing of the db/ helper folder
+RedirectMatch 403 ^/api/db/.*\.(php|sql)$
