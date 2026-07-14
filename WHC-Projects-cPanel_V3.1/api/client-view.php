@@ -58,35 +58,74 @@ try {
     $d = $match['data'];
     $proj = $d['project'] ?? [];
 
-    // Build the client-safe scope list. Scope now lives in quotationGroups;
-    // show each group's scope items and any milestone stage progress. Only
-    // client-appropriate fields (name + status) — never values or fees.
-    $stages = [];
-    $doneCount = 0; $totalCount = 0;
-    $scopeNames = [];
+    // Build the client-safe quotation list — one entry PER quotation (the
+    // original + each revision), so the client page can show them as
+    // separate tabs, matching Coordinator's view. Only client-appropriate
+    // fields (name/code/desc + milestone status) — never values or fees.
+    $quotations = [];
+    $msTotalValue = 0; $msCreditedValue = 0;
     foreach (($d['quotationGroups'] ?? []) as $g) {
-        // Scope-of-work deliverables (names only; no values exposed).
+        $scopeItems = [];
         foreach (($g['scope'] ?? []) as $s) {
             $nm = $s['name'] ?? '';
-            if ($nm !== '') $scopeNames[] = $nm;
+            if ($nm === '') continue;
+            $scopeItems[] = ['code' => $s['code'] ?? '', 'name' => $nm, 'desc' => $s['desc'] ?? ''];
         }
-        // Milestones carry the real progress status shown to the client.
+        $groupTotal = $g['contractTotal'] ?? 0;
+        $milestones = [];
         foreach (($g['milestones'] ?? []) as $m) {
             $nm = $m['name'] ?? '';
-            $st = $m['stageStatus'] ?? 'Not started';
-            $totalCount++;
-            if ($st === 'Done') $doneCount++;
-            if ($nm !== '') $stages[] = ['name' => $nm, 'status' => $st, 'pct' => 0];
+            if ($nm === '') continue;
+            $stageStatus = $m['stageStatus'] ?? 'Not started';
+            $isRaised = ($stageStatus === 'Raise Invoice' || $stageStatus === 'Done'); // mirrors shared.js isMilestoneRaised()
+            $rawStatus = $m['status'] ?? '';
+            // Mirrors shared.js accountStatus() — Account's own 4-state
+            // progression (Open / Invoice Pending / Invoice Raised /
+            // Credited), with the same legacy-data inference for older
+            // records that only ever had pending/credited.
+            if ($rawStatus === 'credited' || $rawStatus === 'Credited') {
+                $status = 'Credited';
+            } elseif (in_array($rawStatus, ['Open', 'Invoice Pending', 'Invoice Raised'], true)) {
+                $status = $rawStatus;
+            } else {
+                $status = $isRaised ? 'Invoice Pending' : 'Open';
+            }
+            // Milestone progress is by VALUE, not a headcount ratio — mirrors
+            // the live amount calc used everywhere else (contractTotal × pct).
+            // Completed Scope Payment rows are excluded — they're a closeout
+            // payment for Hold/Cancelled projects, not normal progress.
+            $amt = $groupTotal ? round($groupTotal * ((float)($m['pct'] ?? 0)) / 100) : (float)($m['amount'] ?? 0);
+            if (!empty($m['isGovtFee'])) $amt = (float)($m['actualAmount'] ?? 0);
+            if (empty($m['isCompletedScopePayment'])) {
+                $msTotalValue += $amt;
+                if ($status === 'Credited') $msCreditedValue += $amt;
+            }
+            $milestones[] = ['name' => $nm, 'status' => $status];
         }
+        $quotations[] = [
+            'quotationNo' => $g['quotationNo'] ?? '',
+            'isRevision'  => !empty($g['isRevision']),
+            'createdAt'   => $g['createdAt'] ?? '',
+            'scopeItems'  => $scopeItems,
+            'milestones'  => $milestones,
+        ];
     }
-    // Fallback to legacy awarded_scope stages if no groups yet.
-    if (!$stages) {
+    // Fallback to legacy awarded_scope stages if no quotation groups yet —
+    // no milestone value data exists in this path, so the milestone
+    // percentage just stays 0 (handled below).
+    if (!$quotations) {
+        $legacyScope = [];
         foreach (($d['stages'] ?? []) as $s) {
             if (($s['type'] ?? '') !== 'awarded_scope') continue;
-            $stages[] = ['name' => $s['name'] ?? '', 'status' => $s['status'] ?? 'Not started', 'pct' => 0];
+            $nm = $s['name'] ?? '';
+            if ($nm === '') continue;
+            $legacyScope[] = ['code' => '', 'name' => $nm, 'desc' => ''];
+        }
+        if ($legacyScope) {
+            $quotations[] = ['quotationNo' => '', 'isRevision' => false, 'createdAt' => '', 'scopeItems' => $legacyScope, 'milestones' => []];
         }
     }
-    $overall = $totalCount ? (int)round(min(100, ($doneCount / $totalCount) * 100)) : 0;
+    $milestonePercent = $msTotalValue > 0 ? (int)round(min(100, ($msCreditedValue / $msTotalValue) * 100)) : 0;
 
     // Approval stages (drawing prep / authority approvals). Client sees only
     // the stage name + a simplified status — never app numbers or internal dates.
@@ -143,9 +182,9 @@ try {
         'ok'        => true,
         'title'     => $displayTitle,
         'client'    => $match['row']['client'] ?: ($proj['client'] ?? ''),
-        'percent'        => $overall,
-        'stages'         => $stages,
-        'scopeItems'     => array_values(array_unique($scopeNames)),
+        'milestonePercent' => $milestonePercent,
+        'percent'        => $milestonePercent, // kept for older cached client pages
+        'quotations'     => $quotations,
         'approvalStages' => $approvalStages,
         'approvalPercent'=> $approvalPct,
         'documents'      => $documents,

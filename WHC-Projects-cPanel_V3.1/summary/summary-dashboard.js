@@ -1,5 +1,5 @@
 // ============================================================
-//  Winner Holistic Consultants – Summary Dashboard
+//  Winner Holistic Consultants – Overall Summary
 //  summary-dashboard.js
 //  Depends on: shared/shared.js
 // ============================================================
@@ -25,11 +25,22 @@ async function loadSummaryData() {
     fbGet("projects", { fresh: true })
   ]);
 
-  // Aggregate LPO totals across all projects (raised vs credited).
+  // Aggregate LPO totals across all projects (raised vs credited). Reads
+  // from quotationGroups[].milestones — the real data source — not the
+  // dead legacy p.lpos array (never populated by the actual award
+  // pipeline), which was silently making this whole KPI block report zero.
   const projList = Object.values(projects || {});
   let lpoRaised = 0, lpoCredited = 0, lpoPending = 0, lpoCount = 0, projWithLpo = 0;
   projList.forEach(p => {
-    const t = lpoTotals(p.lpos);
+    const flat = [];
+    (p.quotationGroups || []).forEach(g => {
+      const gt = g.contractTotal || 0;
+      (g.milestones || []).forEach(m => flat.push({
+        amount: (typeof milestoneAmount === "function") ? milestoneAmount(m, gt) : (m.amount || 0),
+        status: ((typeof accountStatus === "function") ? accountStatus(m) : m.status) === "Credited" ? "credited" : "pending"
+      }));
+    });
+    const t = lpoTotals(flat);
     if (t.count > 0) projWithLpo++;
     lpoRaised += t.raised; lpoCredited += t.credited; lpoPending += t.pending; lpoCount += t.count;
   });
@@ -103,7 +114,7 @@ function renderSummaryDashboard(allData, selectedYear) {
 
   let h = `
   <div class="pbar-header">
-    <div class="pbar-label">📊 Summary Dashboard</div>
+    <div class="pbar-label">📊 Overall Summary</div>
     <div style="display:flex;gap:7px;align-items:center">
       <select data-vo-safe class="fi" style="width:auto;padding:5px 10px;font-size:12px"
         onchange="S.summaryYear=parseInt(this.value);renderSummaryPage()">
@@ -116,18 +127,18 @@ function renderSummaryDashboard(allData, selectedYear) {
   </div>
 
   <!-- ── Overall KPI strip ── -->
-  <div style="padding:14px 18px;background:#fff;border-bottom:1px solid #e5e5e5">
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+  <div style="padding:14px 18px;background:var(--surface);border-bottom:1px solid var(--border)">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px">
       ${[
         { n: totalInquiries, l: "Total Inquiries",   c: "#0d2137", icon: "📩" },
         { n: totalConfirmed, l: "Jobs Confirmed",     c: "#166a3f", icon: "✅" },
         { n: convRate+"%",   l: "Conversion Rate",    c: "#a06b00", icon: "📈" },
         { n: "AED "+fmtMoney(totalValue), l: "Total Net Value", c: "#1a5276", icon: "💰" }
       ].map(k => `
-        <div style="background:#f7f7f7;border-radius:10px;padding:12px;text-align:center">
+        <div style="background:var(--surface-2);border-radius:10px;padding:12px;text-align:center">
           <div style="font-size:18px;margin-bottom:4px">${k.icon}</div>
           <div style="font-size:20px;font-weight:700;color:${k.c}">${k.n}</div>
-          <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">${k.l}</div>
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">${k.l}</div>
         </div>`).join("")}
     </div>
   </div>
@@ -141,7 +152,15 @@ function renderSummaryDashboard(allData, selectedYear) {
     // Recompute totals with optional date range on credited income.
     let raised=0, credited=0, pending=0, count=0, projs=0;
     projects.forEach(p => {
-      const lpos = Array.isArray(p.lpos)?p.lpos:[];
+      const lpos = [];
+      (p.quotationGroups || []).forEach(g => {
+        const gt = g.contractTotal || 0;
+        (g.milestones || []).forEach(m => lpos.push({
+          amount: (typeof milestoneAmount === "function") ? milestoneAmount(m, gt) : (m.amount || 0),
+          status: ((typeof accountStatus === "function") ? accountStatus(m) : m.status) === "Credited" ? "credited" : "pending",
+          creditedDate: m.creditedDate || "", dateRaised: m.dateRaised || ""
+        }));
+      });
       if (lpos.length) projs++;
       lpos.forEach(l => {
         const amt = Number(l.amount)||0; count++;
@@ -155,31 +174,31 @@ function renderSummaryDashboard(allData, selectedYear) {
     const L = { raised, credited, pending, count, projects: projs };
     const collRate = L.raised > 0 ? Math.round((L.credited / L.raised) * 100) : 0;
     const rangeTxt = ranged ? ((from||"Start")+" → "+(to||"Today")) : "All Time";
-    return `<div style="padding:14px 18px;background:#fff;border-bottom:1px solid #e5e5e5">
+    return `<div style="padding:14px 18px;background:var(--surface);border-bottom:1px solid var(--border)">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-        <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px">💳 Account · LPO Payments</div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px">💳 Account · LPO Payments</div>
         <div style="margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          <span style="font-size:10px;color:#999;text-transform:uppercase">From</span>
+          <span style="font-size:10px;color:var(--text-muted);text-transform:uppercase">From</span>
           <input type="date" value="${from}" onchange="S.lpoFrom=this.value;renderSummaryPage()"
-            style="border:1px solid #ddd;border-radius:7px;padding:5px 8px;font-size:12px"/>
-          <span style="font-size:10px;color:#999;text-transform:uppercase">To</span>
+            style="border:1px solid var(--border);border-radius:7px;padding:5px 8px;font-size:12px"/>
+          <span style="font-size:10px;color:var(--text-muted);text-transform:uppercase">To</span>
           <input type="date" value="${to}" onchange="S.lpoTo=this.value;renderSummaryPage()"
-            style="border:1px solid #ddd;border-radius:7px;padding:5px 8px;font-size:12px"/>
-          ${ranged?`<button onclick="S.lpoFrom='';S.lpoTo='';renderSummaryPage()" style="border:none;background:#f0f0f0;color:#555;border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer">Clear</button>`:""}
+            style="border:1px solid var(--border);border-radius:7px;padding:5px 8px;font-size:12px"/>
+          ${ranged?`<button onclick="S.lpoFrom='';S.lpoTo='';renderSummaryPage()" style="border:none;background:var(--surface-2);color:var(--text-muted);border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer">Clear</button>`:""}
         </div>
       </div>
-      <div style="font-size:10px;color:#aaa;margin-bottom:8px">Credited income: ${rangeTxt}</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+      <div style="font-size:10px;color:var(--text-muted);margin-bottom:8px">Credited income: ${rangeTxt}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px">
         ${[
           { n: "AED "+fmtMoney(L.raised),   l: `LPO Raised (${L.count})`, c: "#1a5276", icon: "🧾" },
           { n: "AED "+fmtMoney(L.credited), l: ranged?"Credited In Range":"Credited", c: "#166a3f", icon: "✅" },
           { n: "AED "+fmtMoney(L.pending),  l: "Pending",                 c: "#a06b00", icon: "⏳" },
           { n: collRate+"%",                l: "Collection Rate",         c: "#7b3fb8", icon: "📊" }
         ].map(k => `
-          <div style="background:#f7f7f7;border-radius:10px;padding:12px;text-align:center">
+          <div style="background:var(--surface-2);border-radius:10px;padding:12px;text-align:center">
             <div style="font-size:18px;margin-bottom:4px">${k.icon}</div>
             <div style="font-size:20px;font-weight:700;color:${k.c}">${k.n}</div>
-            <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">${k.l}</div>
+            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">${k.l}</div>
           </div>`).join("")}
       </div>
     </div>`;
@@ -203,33 +222,33 @@ function renderSummaryDashboard(allData, selectedYear) {
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px">
             <div style="text-align:center">
               <div style="font-size:18px;font-weight:700;color:${col.color}">${k.total_inquiries}</div>
-              <div style="font-size:9px;color:#888">Inquiries</div>
+              <div style="font-size:9px;color:var(--text-muted)">Inquiries</div>
             </div>
             <div style="text-align:center">
-              <div style="font-size:18px;font-weight:700;color:#166a3f">${k.confirmed}</div>
-              <div style="font-size:9px;color:#888">Confirmed</div>
+              <div style="font-size:18px;font-weight:700;color:var(--money-color)">${k.confirmed}</div>
+              <div style="font-size:9px;color:var(--text-muted)">Confirmed</div>
             </div>
             <div style="text-align:center">
               <div style="font-size:18px;font-weight:700;color:#a06b00">${rate}%</div>
-              <div style="font-size:9px;color:#888">Rate</div>
+              <div style="font-size:9px;color:var(--text-muted)">Rate</div>
             </div>
           </div>
           <div style="background:rgba(255,255,255,0.6);border-radius:8px;padding:8px">
             <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
-              <span style="color:#555">Net Value</span>
-              <span style="font-weight:700;color:#166a3f">AED ${fmtMoney(k.net_value)}</span>
+              <span style="color:var(--text-muted)">Net Value</span>
+              <span style="font-weight:700;color:var(--money-color)">AED ${fmtMoney(k.net_value)}</span>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
-              <span style="color:#555">LPO Received</span>
+              <span style="color:var(--text-muted)">LPO Received</span>
               <span style="font-weight:600;color:#1a5276">${k.lpo_received}</span>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:11px">
-              <span style="color:#555">Open / Lost</span>
-              <span style="color:#555">${k.open} / ${k.lost}</span>
+              <span style="color:var(--text-muted)">Open / Lost</span>
+              <span style="color:var(--text-muted)">${k.open} / ${k.lost}</span>
             </div>
           </div>
           ${k.sub_adm || k.sub_adcd || k.sub_addc || k.freelancer ? `
-          <div style="margin-top:8px;font-size:10px;color:#888">
+          <div style="margin-top:8px;font-size:10px;color:var(--text-muted)">
             <div style="font-weight:600;color:${col.color};margin-bottom:3px">Sub-contractor Breakdown</div>
             ${k.sub_adm  ? `<div>ADM: AED ${fmtMoney(k.sub_adm)}</div>` : ""}
             ${k.sub_adcd ? `<div>ADCD: AED ${fmtMoney(k.sub_adcd)}</div>` : ""}
@@ -247,16 +266,16 @@ function renderSummaryDashboard(allData, selectedYear) {
     <div style="overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead>
-          <tr style="background:#f7f7f7">
-            <th style="padding:11px 10px;text-align:left;border-bottom:2px solid #e5e5e5;white-space:nowrap">Month</th>
+          <tr style="background:var(--surface-2)">
+            <th style="padding:11px 10px;text-align:left;border-bottom:2px solid var(--border);color:var(--text);white-space:nowrap">Month</th>
             ${CATEGORIES.map(cat => {
               const col = CAT_COLORS[cat];
               return `<th colspan="3" style="padding:8px;text-align:center;border-bottom:2px solid ${col.badge};color:${col.color};white-space:nowrap">
                 ${cat.replace(" Folder","")}</th>`;
             }).join("")}
-            <th colspan="2" style="padding:8px;text-align:center;border-bottom:2px solid #0d2137;color:#0d2137">Total</th>
+            <th colspan="2" style="padding:8px;text-align:center;border-bottom:2px solid var(--text);color:var(--text)">Total</th>
           </tr>
-          <tr style="background:#fafafa;font-size:11.5px;color:#888">
+          <tr style="background:var(--surface-3);font-size:11.5px;color:var(--text-muted)">
             <th style="padding:5px 8px"></th>
             ${CATEGORIES.map(() => `
               <th style="padding:5px 4px;text-align:center">Inq.</th>
@@ -271,29 +290,29 @@ function renderSummaryDashboard(allData, selectedYear) {
             const rowTotal = CATEGORIES.reduce((s, c) => s + (row[c]?.confirmed || 0), 0);
             const rowValue = CATEGORIES.reduce((s, c) => s + (row[c]?.net_value || 0), 0);
             const isCurrentMonth = new Date().getMonth() === i && new Date().getFullYear() === year;
-            return `<tr style="border-bottom:1px solid #f0f0f0;${isCurrentMonth ? "background:#fffde7;" : ""}">
-              <td style="padding:9px 10px;font-weight:${isCurrentMonth?"700":"400"};color:#333;white-space:nowrap">
+            return `<tr style="border-bottom:1px solid var(--border-soft);${isCurrentMonth ? "background:var(--highlight-row);" : ""}">
+              <td style="padding:9px 10px;font-weight:${isCurrentMonth?"700":"400"};color:var(--text);white-space:nowrap">
                 ${row.month} ${year}${isCurrentMonth ? " ◀" : ""}
               </td>
               ${CATEGORIES.map(cat => {
                 const d = row[cat] || {};
                 const col = CAT_COLORS[cat];
                 return `
-                  <td style="padding:9px 8px;text-align:center;color:#555">${d.inquiries || 0}</td>
+                  <td style="padding:9px 8px;text-align:center;color:var(--text-muted)">${d.inquiries || 0}</td>
                   <td style="padding:9px 8px;text-align:center">
                     ${d.confirmed ? `<span style="background:${col.bg};color:${col.color};padding:1px 6px;border-radius:8px;font-weight:600">${d.confirmed}</span>` : "—"}
                   </td>
-                  <td style="padding:9px 10px;text-align:right;color:${d.net_value ? "#166a3f" : "#ccc"};font-weight:${d.net_value?"600":"400"}">
+                  <td style="padding:9px 10px;text-align:right;color:${d.net_value ? "var(--money-color)" : "var(--text-faint)"};font-weight:${d.net_value?"600":"400"}">
                     ${d.net_value ? fmtMoney(d.net_value) : "—"}
                   </td>`;
               }).join("")}
-              <td style="padding:9px 8px;text-align:center;font-weight:700;color:#0d2137">${rowTotal || "—"}</td>
-              <td style="padding:9px 10px;text-align:right;font-weight:700;color:#166a3f">${rowValue ? fmtMoney(rowValue) : "—"}</td>
+              <td style="padding:9px 8px;text-align:center;font-weight:700;color:var(--text)">${rowTotal || "—"}</td>
+              <td style="padding:9px 10px;text-align:right;font-weight:700;color:var(--money-color)">${rowValue ? fmtMoney(rowValue) : "—"}</td>
             </tr>`;
           }).join("")}
         </tbody>
         <tfoot>
-          <tr style="background:#f0f2f5;font-weight:700;border-top:2px solid #e5e5e5">
+          <tr style="background:var(--surface-3);font-weight:700;border-top:2px solid var(--border);color:var(--text)">
             <td style="padding:8px">Total ${year}</td>
             ${CATEGORIES.map(cat => {
               const k = kpis[cat];
@@ -302,14 +321,14 @@ function renderSummaryDashboard(allData, selectedYear) {
               const yearConf = monthlyRows.reduce((s,r) => s+(r[cat]?.confirmed||0),0);
               const yearVal  = monthlyRows.reduce((s,r) => s+(r[cat]?.net_value||0),0);
               return `
-                <td style="padding:8px 4px;text-align:center;color:#555">${yearInq}</td>
+                <td style="padding:8px 4px;text-align:center;color:var(--text-muted)">${yearInq}</td>
                 <td style="padding:8px 4px;text-align:center;color:${col.color}">${yearConf}</td>
-                <td style="padding:8px 4px;text-align:right;color:#166a3f">${yearVal ? fmtMoney(yearVal) : "—"}</td>`;
+                <td style="padding:8px 4px;text-align:right;color:var(--money-color)">${yearVal ? fmtMoney(yearVal) : "—"}</td>`;
             }).join("")}
-            <td style="padding:8px 4px;text-align:center;color:#0d2137">
+            <td style="padding:8px 4px;text-align:center;color:var(--text)">
               ${CATEGORIES.reduce((s,c)=>s+monthlyRows.reduce((ss,r)=>ss+(r[c]?.confirmed||0),0),0)}
             </td>
-            <td style="padding:8px 4px;text-align:right;color:#166a3f">
+            <td style="padding:8px 4px;text-align:right;color:var(--money-color)">
               ${fmtMoney(CATEGORIES.reduce((s,c)=>s+monthlyRows.reduce((ss,r)=>ss+(r[c]?.net_value||0),0),0))}
             </td>
           </tr>
@@ -318,170 +337,23 @@ function renderSummaryDashboard(allData, selectedYear) {
     </div>
   </div>
 
-  <!-- ── Coordinator workload (from Live & ID records) ── -->
-  ${renderCoordinatorBlock(allData)}
-  ${renderCoordMembersBlock(allData)}
-  ${renderAccountMembersBlock(allData)}
+  <!-- Team Performance moved to its own module — /team-performance/ -->
+  <div class="sbox sbox-wide" style="margin-top:12px;text-align:center;padding:20px">
+    <div style="font-size:14px;font-weight:600;color:#1a2740">🏆 Team Performance</div>
+    <div style="font-size:12px;color:var(--text-muted);margin:4px 0 10px">Proposals, Coordinator &amp; Account leaderboards now have their own page.</div>
+    <a href="/team-performance/" class="btn btn-gold" style="display:inline-block;text-decoration:none">Open Team Performance →</a>
+  </div>
 
   </div>
-  <div class="footer">Winner Holistic Consultants · Summary Dashboard · <a href="${window.location.pathname}" style="color:#888">Back</a></div>`;
+  <div class="footer">Winner Holistic Consultants · Overall Summary · <a href="${window.location.pathname}" style="color:var(--text-muted)">Back</a></div>`;
 
   return h;
-}
-
-// ── Coordinator workload block ────────────────────────────────
-function renderCoordinatorBlock(allData) {
-  const coordMap = {};
-  CATEGORIES.forEach(cat => {
-    (allData[cat] || []).forEach(r => {
-      const pcs = [r.pc1, r.pc2, r.proposal_incharge].filter(Boolean);
-      pcs.forEach(pc => {
-        if (!coordMap[pc]) coordMap[pc] = { total: 0, confirmed: 0, net: 0, cats: new Set() };
-        coordMap[pc].total++;
-        coordMap[pc].cats.add(cat.replace(" Folder",""));
-        if (["Converted","Won"].includes(r.open_status)) {
-          coordMap[pc].confirmed++;
-          coordMap[pc].net += parseFloat(r.net_amount) || 0;
-        }
-      });
-    });
-  });
-
-  const entries = Object.entries(coordMap).sort((a,b) => b[1].net - a[1].net || b[1].confirmed - a[1].confirmed);
-  if (!entries.length) return "";
-
-  const teamNet = entries.reduce((s,[,d]) => s + (d.net||0), 0) || 1;
-  const medals = ["🥇","🥈","🥉"];
-  const avatarColors = ["#6d28d9","#2563eb","#059669","#7c3aed","#d97706","#db2777","#0891b2","#65a30d"];
-
-  return `
-  <div class="sbox sbox-wide" style="margin-top:12px">
-    <div class="sbox-title">🧑‍💼 Team Performance</div>
-    <div class="tp-grid">
-      ${entries.map(([name, d], i) => {
-        const conv = d.total ? Math.round((d.confirmed / d.total) * 100) : 0;
-        const share = Math.round((d.net / teamNet) * 100);
-        const col = avatarColors[i % avatarColors.length];
-        const initials = name.trim().split(/\s+/).map(w=>w[0]).slice(0,2).join("").toUpperCase();
-        const rankBadge = i < 3 ? medals[i] : `#${i+1}`;
-        const convColor = conv >= 50 ? "#166a3f" : conv >= 25 ? "#a06b00" : "#a32d2d";
-        return `
-        <div class="tp-card${i===0?" tp-top":""}">
-          <div class="tp-rank">${rankBadge}</div>
-          <div class="tp-head">
-            <div class="tp-avatar" style="background:${col}">${esc(initials||"?")}</div>
-            <div class="tp-namewrap">
-              <div class="tp-name">${esc(name)}</div>
-              <div class="tp-cats">${[...d.cats].join(" · ")||"—"}</div>
-            </div>
-          </div>
-          <div class="tp-stats">
-            <div class="tp-stat"><div class="tp-stat-n">${d.total}</div><div class="tp-stat-l">Inquiries</div></div>
-            <div class="tp-stat"><div class="tp-stat-n" style="color:#166a3f">${d.confirmed}</div><div class="tp-stat-l">Confirmed</div></div>
-            <div class="tp-stat"><div class="tp-stat-n" style="color:${convColor}">${conv}%</div><div class="tp-stat-l">Conversion</div></div>
-          </div>
-          <div class="tp-net">
-            <span class="tp-net-v">AED ${fmtMoney(d.net)}</span>
-            <span class="tp-net-share">${share}% of team</span>
-          </div>
-          <div class="tp-bar"><div class="tp-bar-fill" style="width:${share}%;background:${col}"></div></div>
-        </div>`;
-      }).join("")}
-    </div>
-  </div>`;
-}
-
-// ── Project Coordinator members (avatar + project count) ──────
-function renderCoordMembersBlock(allData) {
-  const projects = allData._projects || [];
-  const map = {};
-  projects.forEach(p => {
-    const c = (p.project && p.project.coordinator) || "";
-    if (!c) return;
-    if (!map[c]) map[c] = { total: 0, active: 0, done: 0 };
-    map[c].total++;
-    const st = (typeof projStatus === "function") ? projStatus(p) : "";
-    if (st === "done") map[c].done++; else map[c].active++;
-  });
-  const entries = Object.entries(map).sort((a,b) => b[1].total - a[1].total);
-  if (!entries.length) return "";
-  const colors = ["#6d28d9","#2563eb","#059669","#7c3aed","#d97706","#db2777","#0891b2","#65a30d"];
-  const label = (v) => (typeof _coordLabel === "function") ? _coordLabel(v) : v;
-  return `
-  <div class="sbox sbox-wide" style="margin-top:12px">
-    <div class="sbox-title">🧑‍🔧 Project Coordinators</div>
-    <div class="tp-grid">
-      ${entries.map(([name,d],i)=>{
-        const disp = label(name);
-        const col = colors[i%colors.length];
-        const initials = String(disp).trim().split(/\s+/).map(w=>w[0]).slice(0,2).join("").toUpperCase();
-        return `
-        <div class="tp-card">
-          <div class="tp-rank">#${i+1}</div>
-          <div class="tp-head">
-            <div class="tp-avatar" style="background:${col}">${esc(initials||"?")}</div>
-            <div class="tp-namewrap"><div class="tp-name">${esc(disp)}</div><div class="tp-cats">Coordinator</div></div>
-          </div>
-          <div class="tp-stats">
-            <div class="tp-stat"><div class="tp-stat-n">${d.total}</div><div class="tp-stat-l">Projects</div></div>
-            <div class="tp-stat"><div class="tp-stat-n" style="color:#1a5fb4">${d.active}</div><div class="tp-stat-l">Active</div></div>
-            <div class="tp-stat"><div class="tp-stat-n" style="color:#166a3f">${d.done}</div><div class="tp-stat-l">Done</div></div>
-          </div>
-        </div>`;
-      }).join("")}
-    </div>
-  </div>`;
-}
-
-// ── Account members (avatar + milestone count owned) ──────────
-function renderAccountMembersBlock(allData) {
-  const projects = allData._projects || [];
-  const map = {};
-  projects.forEach(p => {
-    (p.lpos || []).forEach(l => {
-      const o = l.owner || "";
-      if (!o) return;
-      if (!map[o]) map[o] = { total: 0, credited: 0, pending: 0, amount: 0 };
-      map[o].total++;
-      map[o].amount += Number(l.amount) || 0;
-      if (l.status === "credited") map[o].credited++; else map[o].pending++;
-    });
-  });
-  const entries = Object.entries(map).sort((a,b) => b[1].total - a[1].total);
-  if (!entries.length) return "";
-  const colors = ["#059669","#2563eb","#6d28d9","#d97706","#db2777","#0891b2","#7c3aed","#65a30d"];
-  const label = (v) => (typeof _ownerLabel === "function") ? _ownerLabel(v) : v;
-  return `
-  <div class="sbox sbox-wide" style="margin-top:12px">
-    <div class="sbox-title">💰 Account Team — Milestones</div>
-    <div class="tp-grid">
-      ${entries.map(([name,d],i)=>{
-        const disp = label(name);
-        const col = colors[i%colors.length];
-        const initials = String(disp).trim().split(/\s+/).map(w=>w[0]).slice(0,2).join("").toUpperCase();
-        return `
-        <div class="tp-card">
-          <div class="tp-rank">#${i+1}</div>
-          <div class="tp-head">
-            <div class="tp-avatar" style="background:${col}">${esc(initials||"?")}</div>
-            <div class="tp-namewrap"><div class="tp-name">${esc(disp)}</div><div class="tp-cats">Accounts</div></div>
-          </div>
-          <div class="tp-stats">
-            <div class="tp-stat"><div class="tp-stat-n">${d.total}</div><div class="tp-stat-l">Milestones</div></div>
-            <div class="tp-stat"><div class="tp-stat-n" style="color:#a06b00">${d.pending}</div><div class="tp-stat-l">Awaiting</div></div>
-            <div class="tp-stat"><div class="tp-stat-n" style="color:#166a3f">${d.credited}</div><div class="tp-stat-l">Credited</div></div>
-          </div>
-          <div class="tp-net"><span class="tp-net-v">AED ${fmtMoney(d.amount)}</span></div>
-        </div>`;
-      }).join("")}
-    </div>
-  </div>`;
 }
 
 // ── Entry points called from main render ──────────────────────
 async function loadAndRenderSummary() {
   document.getElementById("app").innerHTML =
-    `<div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">Loading summary...</div></div>`;
+    `<div class="loading"><div class="spinner"></div><div style="font-size:13px;color:var(--text-muted)">Loading summary...</div></div>`;
   S._summaryData = await loadSummaryData();
   renderSummaryPage();
 }

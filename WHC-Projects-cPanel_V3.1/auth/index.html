@@ -3,70 +3,75 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<script>
+// Apply saved theme/accent/density BEFORE the stylesheet paints, so there's
+// no flash of the wrong theme on load. Deliberately tiny and dependency-free
+// (shared.js hasn't loaded yet) — mirrors applyThemePrefs() in shared.js.
+(function(){
+  try{
+    var t=localStorage.getItem("whc_theme"), a=localStorage.getItem("whc_accent"), d=localStorage.getItem("whc_density");
+    if(t==="dark") document.documentElement.setAttribute("data-theme","dark");
+    if(a && a!=="default") document.documentElement.setAttribute("data-accent",a);
+    if(d==="compact") document.documentElement.setAttribute("data-density","compact");
+  }catch(e){}
+})();
+</script>
 <title>WHC – Portal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Poppins:wght@500;600;700&display=swap"/>
-<link rel="stylesheet" href="../shared/style.css"/>
+<link rel="stylesheet" href="../shared/style.css?v=20260714i"/>
 <style>
 /* auth full width */
 #app{max-width:none!important}
 
-/* ── Portal hub — light, polished ── */
-.portal-top{background:linear-gradient(160deg,#8b5cf6 0%,#6d28d9 60%,#4c1d95 120%);padding:18px 22px;color:#fff;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid rgba(255,255,255,0.1)}
+/* ── Portal hub ── */
+.portal-top{background:linear-gradient(160deg,var(--sun1) 0%,var(--sun2) 60%,var(--sun3) 120%);padding:18px 22px;color:#fff;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid rgba(255,255,255,0.1)}
 .portal-top .who{text-align:right;flex-shrink:0}
 .portal-brand{font-size:13px;letter-spacing:2px;color:#fff;text-transform:uppercase;font-weight:600}
 .portal-sub{font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px}
-.portal-wrap{max-width:1100px;margin:0 auto;padding:26px 26px 60px}
-.portal-greet{font-family:'Poppins','DM Sans',sans-serif;font-size:22px;color:#0d2137;margin-bottom:4px}
-.portal-greet-sub{font-size:12px;color:#888;margin-bottom:22px}
+.portal-wrap{max-width:1100px;margin:0 auto;padding:26px 26px 60px;background:var(--bg)}
+.portal-greet{font-family:'Poppins','DM Sans',sans-serif;font-size:22px;color:var(--text);margin-bottom:4px}
+.portal-greet-sub{font-size:12px;color:var(--text-muted);margin-bottom:22px}
 .tile-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
-.tile{position:relative;background:linear-gradient(160deg,#ffffff 0%,#f4f6fa 100%);border:1px solid #e4e8ef;border-radius:16px;padding:22px 18px;text-decoration:none;color:inherit;display:block;transition:transform 0.22s cubic-bezier(.2,.8,.2,1),box-shadow 0.22s,border-color 0.22s;overflow:hidden;box-shadow:0 1px 1px rgba(13,33,55,0.04),0 6px 12px rgba(13,33,55,0.08),0 14px 28px rgba(13,33,55,0.06),inset 0 1px 0 rgba(255,255,255,0.9);transform:perspective(800px) translateZ(0)}
+.tile{position:relative;background:linear-gradient(160deg,var(--surface) 0%,var(--surface-2) 100%);border:1px solid var(--border);border-radius:16px;padding:22px 18px;text-decoration:none;color:inherit;display:block;transition:transform 0.22s cubic-bezier(.2,.8,.2,1),box-shadow 0.22s,border-color 0.22s;overflow:hidden;box-shadow:var(--shadow-card);transform:perspective(800px) translateZ(0)}
 .tile.on{cursor:pointer}
-.tile.on::after{content:'';position:absolute;inset:0;border-radius:16px;background:radial-gradient(140px 90px at 78% 6%,rgba(109,40,217,0.16),transparent 70%);pointer-events:none;opacity:0;transition:opacity 0.22s}
-.tile.on:hover{transform:perspective(800px) translateY(-6px) rotateX(4deg) scale(1.015);box-shadow:0 2px 2px rgba(13,33,55,0.05),0 14px 24px rgba(13,33,55,0.14),0 26px 48px rgba(13,33,55,0.12),0 0 0 1px rgba(109,40,217,0.45),inset 0 1px 0 rgba(255,255,255,0.95);border-color:#6d28d9}
+.tile.on::after{content:'';position:absolute;inset:0;border-radius:16px;background:radial-gradient(140px 90px at 78% 6%,rgba(0,0,0,0.08),transparent 70%);pointer-events:none;opacity:0;transition:opacity 0.22s}
+.tile.on:hover{transform:perspective(800px) translateY(-6px) rotateX(4deg) scale(1.015);box-shadow:0 2px 2px rgba(13,33,55,0.05),0 14px 24px rgba(13,33,55,0.14),0 26px 48px rgba(13,33,55,0.12),0 0 0 1px var(--sun2);border-color:var(--sun2)}
 .tile.on:hover::after{opacity:1}
 .tile.on:active{transform:perspective(800px) translateY(-2px) scale(1.0);transition:transform 0.08s}
-.tile.locked{opacity:0.55;cursor:not-allowed;background:#f4f5f8;box-shadow:inset 0 1px 2px rgba(13,33,55,0.05);border-style:dashed;transform:none}
-.tile-ico{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:21px;margin-bottom:13px;background:linear-gradient(145deg,#ffffff,#e6ebf3);box-shadow:0 2px 5px rgba(13,33,55,0.12),inset 0 1px 0 rgba(255,255,255,0.9),inset 0 -2px 4px rgba(13,33,55,0.06)}
-.tile-title{font-size:15px;font-weight:700;color:#0d2137;display:flex;align-items:center;gap:7px}
-.tile-desc{font-size:11.5px;color:#888;margin-top:4px;line-height:1.5}
-.tile-lock{position:absolute;top:14px;right:14px;font-size:13px;color:#aaa}
-.tile-go{margin-top:14px;font-size:11px;font-weight:600;color:#fff;letter-spacing:0.3px}
-.tile.locked .tile-go{color:#aaa}
+.tile.locked{opacity:0.55;cursor:not-allowed;background:var(--surface-2);box-shadow:inset 0 1px 2px rgba(13,33,55,0.05);border-style:dashed;transform:none}
+.tile-ico{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:21px;margin-bottom:13px;background:linear-gradient(145deg,var(--surface),var(--surface-3));box-shadow:0 2px 5px rgba(13,33,55,0.12),inset 0 1px 0 rgba(255,255,255,0.5),inset 0 -2px 4px rgba(13,33,55,0.06)}
+.tile-title{font-size:15px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px}
+.tile-desc{font-size:11.5px;color:var(--text-muted);margin-top:4px;line-height:1.5}
+.tile-lock{position:absolute;top:14px;right:14px;font-size:13px;color:var(--text-faint)}
+.tile-go{margin-top:14px;font-size:11px;font-weight:600;color:var(--sun1);letter-spacing:0.3px}
+.tile.locked .tile-go{color:var(--text-faint)}
 .role-pill{display:inline-block;margin-top:2px;font-size:11px;font-weight:600;padding:2px 11px;border-radius:10px}
 
-/* ── Sunset theme for the login / first-page ── */
-body{background:#f6f3fe}
-.landing-hero{background:linear-gradient(150deg,#8b5cf6 0%,#6d28d9 55%,#4c1d95 120%)!important}
-.landing-brand{color:#fff!important;opacity:0.95!important}
-.landing-sub{color:rgba(255,255,255,0.7)!important}
-.login-wrap{background:linear-gradient(180deg,#f6f3fe 0%,#ece4fb 100%)}
-.login-box{box-shadow:0 12px 40px rgba(76,29,149,0.18)}
-.btn-gold{background:linear-gradient(135deg,#8b5cf6,#6d28d9)!important;color:#fff!important;border:none!important;box-shadow:0 4px 14px rgba(76,29,149,0.3)}
-.btn-gold:hover{filter:brightness(1.05)}
-.fi:focus{border-color:#6d28d9!important;box-shadow:0 0 0 3px rgba(109,40,217,0.12)!important}
-.portal-greet,.portal-wrap{}
-.portal-wrap{background:linear-gradient(180deg,#f6f3fe 0%,#fbf6f3 100%)}
+/* ── Login / first-page — same accent variables as the sidebar/hub ── */
+body{background:var(--bg)}
+.login-wrap{background:linear-gradient(180deg,var(--bg) 0%,var(--surface-2) 100%)}
 
 /* Company selector on login */
 .co-select{display:flex;flex-direction:column;gap:8px}
 .co-opt{display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;
-  padding:11px 14px;border:2px solid #e8e8e8;border-radius:11px;background:#fff;cursor:pointer;
+  padding:11px 14px;border:2px solid var(--border);border-radius:11px;background:var(--surface);cursor:pointer;
   transition:all 0.14s;font-family:inherit;width:100%}
 .co-opt:hover{border-color:var(--co-accent)}
-.co-opt.on{border-color:var(--co-accent);background:#f7f3fe;
+.co-opt.on{border-color:var(--co-accent);background:var(--surface-2);
   box-shadow:0 3px 12px rgba(0,0,0,0.08)}
-.co-opt-name{font-size:14px;font-weight:700;color:#32325d}
-.co-opt-full{font-size:11px;color:#8898aa}
+.co-opt-name{font-size:14px;font-weight:700;color:var(--text)}
+.co-opt-full{font-size:11px;color:var(--text-muted)}
 .co-opt.on .co-opt-name{color:var(--co-accent)}
 </style>
 </head>
 <body>
 <div id="app"><div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">Loading...</div></div></div>
 
-<script src="../shared/config.js?v=20260705k"></script>
-<script src="../shared/shared.js?v=20260705k"></script>
-<script src="auth.js?v=20260705k"></script>
+<script src="../shared/config.js?v=20260714i"></script>
+<script src="../shared/permissions.js?v=20260714i"></script>
+<script src="../shared/shared.js?v=20260714i"></script>
+<script src="auth.js?v=20260714i"></script>
 <script>
 // ============================================================
 //  WHC Portal hub
@@ -76,13 +81,19 @@ body{background:#f6f3fe}
 //  - Super admins also get a "Manage Users" button (auth.js view).
 // ============================================================
 
-// Which roles may open each module (mirrors the requireRole() guards)
+// Role arrays come from MODULE_ACCESS in shared/permissions.js (single
+// source of truth) — this hub just adds titles/icons/descriptions.
 const MODULES = [
-  { key:"proposals",   url:"/proposals/",   icon:"📝", title:"Proposals",   desc:"Create & manage quotations",     allow:["proposals","super_admin"] },
-  { key:"coordinator", url:"/coordinator/", icon:"📋", title:"Coordinator", desc:"Assigned projects & tracking",    allow:["coordinator","super_admin"] },
-  { key:"account",     url:"/account/",     icon:"⚙️", title:"Account",     desc:"Projects & milestone tracking",  allow:["super_admin","account"] },
-  { key:"payments",    url:"/payments/",    icon:"📊", title:"Milestone Dashboard",  desc:"Project-wise milestone collections & pending", allow:["super_admin","account"] },
-  { key:"summary",     url:"/summary/",     icon:"📊", title:"Summary",     desc:"Dashboard & overview",            allow:["super_admin"] },
+  { key:"proposals",   url:"/proposals/",   icon:"📝", title:"Proposals",   desc:"Create & manage quotations",     allow: MODULE_ACCESS.proposals },
+  { key:"coordinator", url:"/coordinator/", icon:"📋", title:"Coordinator", desc:"Assigned projects & tracking",    allow: MODULE_ACCESS.coordinator },
+  { key:"account",     url:"/account/",     icon:"⚙️", title:"Account",     desc:"Projects & milestone tracking",  allow: MODULE_ACCESS.account },
+];
+// Second row: Milestone + Overall Summary + Templates.
+const MODULES_ROW2 = [
+  { key:"payments",    url:"/payments/",    icon:"📊", title:"Milestone",  desc:"Project-wise milestone collections & pending", allow: MODULE_ACCESS.payments },
+  { key:"summary",     url:"/summary/",     icon:"📊", title:"Overall Summary",     desc:"Dashboard & overview",            allow: MODULE_ACCESS.summary },
+  { key:"templates",   url:"/templates/",   icon:"🧩", title:"Templates",  desc:"Browse & manage Scope and Approval Stage templates", allow: MODULE_ACCESS.templates },
+  { key:"team_performance", url:"/team-performance/", icon:"🏆", title:"Team Performance", desc:"Proposals, Coordinator & Account leaderboards", allow: MODULE_ACCESS.team_performance },
   // NOTE: The Client page (/client/?id=xxx) is intentionally a PUBLIC,
   // per-project link sent to external customers — it has no login by
   // design. It is not listed here because there is nothing to "browse":
@@ -93,6 +104,7 @@ const MODULES = [
 const ROLE_LABEL = {
   super_admin: { label:"Super Admin", style:"background:#FAECE7;color:#712B13" },
   proposals:   { label:"Proposals",   style:"background:#EEEDFE;color:#3C3489" },
+  team_lead:   { label:"Team Lead",   style:"background:#E7F1FD;color:#1A4E8A" },
   coordinator: { label:"Coordinator", style:"background:#FAEEDA;color:#633806" },
 };
 
@@ -109,19 +121,28 @@ async function boot() {
       credentials: "include", body: JSON.stringify({ action: "me" })
     });
     const data = await res.json();
-    if (data && data.user) { setSession(data.user); renderHub(data.user); return; }
+    if (data && data.user) {
+      setSession(data.user);
+      await loadRbacOverrides();
+      renderHub(data.user);
+      return;
+    }
   } catch (e) {}
 
-  // No valid server session → show the login screen.
-  // (The first Super Admin is created once via SQL; see install guide.)
-  renderLoginPage();
+  // No valid server session → show the login screen, with a clear reason
+  // if we landed here because of a timeout or a login elsewhere.
+  const params = new URLSearchParams(window.location.search);
+  let msg = "";
+  if (params.get("session_replaced") === "1") msg = "You've been signed out because this account signed in on another device or browser.";
+  else if (params.get("timeout") === "1") msg = "You've been signed out due to inactivity.";
+  renderLoginPage(msg);
 }
 
 // ── The hub (after login) ─────────────────────────────────────
 function renderHub(user) {
   const roleMeta = ROLE_LABEL[user.role] || { label:user.role, style:"background:#f0f0f0;color:#555" };
 
-  const tiles = MODULES.map(mod => {
+  const renderTile = mod => {
     const ok = canAccess(user, mod);
     if (ok) {
       return `<a class="tile on" href="${mod.url}">
@@ -138,10 +159,14 @@ function renderHub(user) {
       <div class="tile-desc">${mod.desc}</div>
       <div class="tile-go">Locked</div>
     </div>`;
-  }).join("");
+  };
+  const tiles = MODULES.map(renderTile).join("");
+  const tilesRow2 = MODULES_ROW2.map(renderTile).join("");
 
   const manageBtn = user.role === "super_admin"
     ? `<button class="btn btn-out" style="font-size:11px" onclick="loadUsers()">Manage Users</button>` : "";
+  const activityBtn = user.role === "super_admin"
+    ? `<button class="btn btn-out" style="font-size:11px" onclick="openActivityLog()">🕘 Activity Log</button>` : "";
 
   document.getElementById("app").innerHTML = `
   <div class="portal-top">
@@ -161,15 +186,21 @@ function renderHub(user) {
         <div class="portal-greet">Welcome${user.name ? ", " + esc(user.name.split(" ")[0]) : ""}</div>
         <div class="portal-greet-sub">Choose a module below. Locked tiles are outside your access.</div>
       </div>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;position:relative">
+        <button class="btn" style="font-size:11px;background:#0d2137;color:#fff" onclick="toggleThemePanel()">🎨 Appearance</button>
+        <div id="whc-theme-panel" style="display:none;position:absolute;top:36px;right:0;z-index:500;width:230px;background:#0d2137;border-radius:12px;padding:14px;box-shadow:0 12px 30px rgba(0,0,0,0.25)"></div>
         ${manageBtn}
+        ${activityBtn}
         <button class="btn" style="font-size:11px;background:#eef0ff;color:#5b3df5" onclick="openChangePin()">Change PIN</button>
         <button class="btn btn-red" style="font-size:11px" onclick="serverLogout().then(()=>window.location.reload())">Logout</button>
       </div>
     </div>
     <div class="tile-grid">${tiles}</div>
+    <div class="tile-grid" style="margin-top:16px">${tilesRow2}</div>
     <div id="change-pin-modal"></div>
   </div>`;
+  if (typeof applyThemePrefs === "function") applyThemePrefs();
+  if (typeof renderThemePanel === "function") renderThemePanel();
 }
 
 // Change-PIN modal (self-service, verifies current PIN).
@@ -224,7 +255,7 @@ function renderLoginPage(errMsg) {
   <div class="landing-hero">
     <div class="landing-brand">Winner Group</div>
     <div class="landing-title">Team Login</div>
-    <div class="landing-sub">Select your company, then enter your name and PIN</div>
+    <div class="landing-sub">Select your company, then enter your email and PIN</div>
   </div>
   <div class="login-wrap" style="padding-top:28px"><div class="login-box">
     ${errMsg ? `<div class="err-msg">${esc(errMsg)}</div>` : ""}
@@ -233,7 +264,7 @@ function renderLoginPage(errMsg) {
       ${COMPANIES.map(c => `<option value="${c.id}" ${c.id===sel?"selected":""}>${esc(c.name)}</option>`).join("")}
     </select>
     <div class="fl" style="margin-bottom:6px">Email</div>
-    <input class="fi" id="lg-name" placeholder="your.name@winnerhc.com" style="margin-bottom:10px"
+    <input class="fi" id="lg-email" type="email" placeholder="your.name@winnerhc.com" style="margin-bottom:10px"
       autocomplete="username"/>
     <div class="fl" style="margin-bottom:6px">PIN</div>
     <input class="fi" id="lg-pin" type="password" placeholder="Your PIN" style="margin-bottom:16px"
@@ -252,17 +283,18 @@ function pickCompany(id) {
 }
 
 async function submitLogin() {
-  const nameOrEmail = document.getElementById("lg-name")?.value.trim() || "";
+  const email = document.getElementById("lg-email")?.value.trim() || "";
   const pin = document.getElementById("lg-pin")?.value.trim() || "";
   // Lock in whichever company the dropdown currently shows.
   const co = document.getElementById("lg-company")?.value;
   if (co) setCompany(co);
-  if (!nameOrEmail || !pin) { renderLoginPage("Please enter your email and PIN."); return; }
+  if (!email || !pin) { renderLoginPage("Please enter your email and PIN."); return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { renderLoginPage("Enter a valid email address."); return; }
 
   document.getElementById("app").innerHTML = `<div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">Verifying...</div></div>`;
 
-  const user = await loginWithPin(nameOrEmail, pin);
-  if (!user) { renderLoginPage("Incorrect name or PIN. Please try again."); return; }
+  const user = await loginWithPin(email, pin);
+  if (!user) { renderLoginPage("Incorrect email or PIN. Please try again."); return; }
 
   // Everyone lands on the hub; tiles unlock based on role.
   renderHub(user);

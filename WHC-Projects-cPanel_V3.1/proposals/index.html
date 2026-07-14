@@ -3,10 +3,23 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<script>
+// Apply saved theme/accent/density BEFORE the stylesheet paints, so there's
+// no flash of the wrong theme on load. Deliberately tiny and dependency-free
+// (shared.js hasn't loaded yet) — mirrors applyThemePrefs() in shared.js.
+(function(){
+  try{
+    var t=localStorage.getItem("whc_theme"), a=localStorage.getItem("whc_accent"), d=localStorage.getItem("whc_density");
+    if(t==="dark") document.documentElement.setAttribute("data-theme","dark");
+    if(a && a!=="default") document.documentElement.setAttribute("data-accent",a);
+    if(d==="compact") document.documentElement.setAttribute("data-density","compact");
+  }catch(e){}
+})();
+</script>
 <title>WHC – Proposals</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Poppins:wght@500;600;700&display=swap"/>
-<link rel="stylesheet" href="../shared/style.css"/>
+<link rel="stylesheet" href="../shared/style.css?v=20260714i"/>
 <button class="scroll-top-btn" id="scrollTopBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></button>
 
 </head>
@@ -18,14 +31,15 @@
 .back-portal-btn:hover{background:#c9a752;color:#0d2137;transform:translateX(-2px)}
 </style>
 <div id="app"><div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">Loading...</div></div></div>
-<script src="../shared/config.js?v=20260705k"></script>
-<script src="../shared/shared.js?v=20260705k"></script>
-<script src="proposals-quotation.js?v=20260705k"></script>
+<script src="../shared/config.js?v=20260714i"></script>
+<script src="../shared/permissions.js?v=20260714i"></script>
+<script src="../shared/shared.js?v=20260714i"></script>
+<script src="proposals-quotation.js?v=20260714i"></script>
 <script>
 let S = {
   proposalTab:"category", selectedCategory:"", summaryYear:new Date().getFullYear(),
   _newQuotationCategory:"", _newQuotationNumber:"", _editingQuotation:null, _listCategory:"", _editMode:false,
-  _summaryData:null, filterStatus:"all", filterIncharge:"all", filterSearch:"", _listRecords:[]
+  _summaryData:null, filterStatus:"all", filterEnquiryStatus:"all", filterIncharge:"all", filterSearch:"", _listRecords:[]
 };
 let CURRENT_USER = null, PROPOSAL_USERS = [];
 
@@ -48,13 +62,97 @@ async function loadCatCounts() {
 }
 
 async function boot() {
-  CURRENT_USER = requireRole("proposals","super_admin");
+  CURRENT_USER = requireModule("proposals");
   if (!CURRENT_USER) return;
+  await loadRbacOverrides();
+  window.WHC_VIEW_ONLY = isViewOnly("proposals", CURRENT_USER.role);
   mountSidebar("proposals");
+  if (window.WHC_VIEW_ONLY) applyViewOnlyMode("Proposals");
   mountViewToggle();
   try { PROPOSAL_USERS = await fetchUsersByRole("proposals"); } catch (e) { PROPOSAL_USERS = []; }
+  if (typeof loadUserDirectory === "function") loadUserDirectory().then(() => { if (S.proposalTab === "new_form") render(); }).catch(()=>{});
+  // Pull in previously-added custom dropdown options (Location, Sub-Contractor
+  // Type, Govt Fee Type) so they show up as suggestions again — non-blocking,
+  // the form re-renders once loaded if the user hasn't already opened it.
+  loadAllOptionLists().then(() => { if (S.proposalTab === "new_form") render(); }).catch(()=>{});
+  if (typeof loadCustomScopeTemplates === "function") loadCustomScopeTemplates().then(() => { if (S.proposalTab === "new_form") render(); }).catch(()=>{});
   render();
   loadCatCounts();
+}
+
+// ── Raise Dependent Task (Proposals side) ──────────────────────
+// Simpler standalone version of Coordinator's modal — Proposals doesn't
+// preload COORDINATOR_USERS the way Coordinator/Account do, so fetch it
+// on demand the first time this is opened.
+async function openDepTaskModalFromProposals(projectId) {
+  if (!projectId) { alert("This quotation isn't linked to a project yet."); return; }
+  S._dtProjectId = projectId;
+  S._dtGroup = "";
+  if (!S._dtUsers) {
+    try { S._dtUsers = await fetchUsersByRole("coordinator"); } catch (e) { S._dtUsers = []; }
+  }
+  S._dtModalOpen = true;
+  render();
+}
+function closeDepTaskModalP() { S._dtModalOpen = false; render(); }
+function _dtSetGroupP(g) { S._dtGroup = g; render(); }
+
+function renderDepTaskModalP() {
+  const group = S._dtGroup || "";
+  const users = S._dtUsers || [];
+  const teamUsers = group ? users.filter(u => u.team === group) : [];
+  const otherUsers = group ? users.filter(u => u.team !== group) : users;
+  return `<div class="overlay" onclick="if(event.target===this)closeDepTaskModalP()">
+    <div class="modal" style="max-width:460px;text-align:left;max-height:88vh;overflow-y:auto">
+      <div style="font-weight:700;font-size:15px;margin-bottom:14px">🔗 Raise Dependent Task</div>
+      <div class="fl">Task Title <span class="req-star">*</span></div>
+      <input class="fi" id="dtp-title" placeholder="e.g. Confirm structural loading calculation" style="margin-bottom:10px"/>
+      <div class="fl">Description</div>
+      <textarea class="fi" id="dtp-desc" rows="3" style="margin-bottom:10px" placeholder="Optional — what's needed and why"></textarea>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div><div class="fl">Priority</div>
+          <select class="fi" id="dtp-priority">${DEP_TASK_PRIORITIES.map(p => `<option ${p==="Medium"?"selected":""}>${p}</option>`).join("")}</select>
+        </div>
+        <div><div class="fl">Due Date</div><input class="fi" type="date" id="dtp-due"/></div>
+      </div>
+      <div class="fl">Assignment Group <span class="req-star">*</span></div>
+      <select class="fi" id="dtp-group" style="margin-bottom:10px" onchange="_dtSetGroupP(this.value)">
+        <option value="">— Select a team —</option>
+        ${DEP_TASK_DEPARTMENTS.map(dep => `<option value="${esc(dep)}" ${group===dep?"selected":""}>${esc(dep)}</option>`).join("")}
+      </select>
+      <div class="fl">Assigned To <span style="font-weight:400;color:#999">— optional, a specific person on that team</span></div>
+      <select class="fi" id="dtp-assignedto" style="margin-bottom:6px">
+        <option value="">— Unassigned (goes to the whole team) —</option>
+        ${teamUsers.length ? `<optgroup label="${esc(group)} team">${teamUsers.map(u => `<option value="${esc(u.email||u.name)}">${esc(u.name)}</option>`).join("")}</optgroup>` : ""}
+        ${otherUsers.length ? `<optgroup label="${teamUsers.length?"Other people":"People"}">${otherUsers.map(u => `<option value="${esc(u.email||u.name)}">${esc(u.name)}</option>`).join("")}</optgroup>` : ""}
+      </select>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button type="button" class="btn" style="flex:1;background:#f3f3f7;color:#333" onclick="closeDepTaskModalP()">Cancel</button>
+        <button type="button" class="btn btn-gold" style="flex:1" onclick="_submitDepTaskP()">Raise Task</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function _submitDepTaskP() {
+  const title = (document.getElementById("dtp-title")?.value || "").trim();
+  if (!title) { alert("Give the task a title."); return; }
+  const assignmentGroup = document.getElementById("dtp-group")?.value || "";
+  if (!assignmentGroup) { alert("Choose an Assignment Group."); return; }
+  const fields = {
+    title,
+    description: document.getElementById("dtp-desc")?.value || "",
+    priority: document.getElementById("dtp-priority")?.value || "Medium",
+    dueDate: document.getElementById("dtp-due")?.value || "",
+    assignmentGroup,
+    assignedTo: document.getElementById("dtp-assignedto")?.value || "",
+    raisedModule: "Proposals",
+  };
+  const id = await createDependentTask(S._dtProjectId, fields);
+  if (!id) { alert("Could not save — the project may not exist on the Coordinator side yet."); return; }
+  S._dtModalOpen = false;
+  alert("Task raised — it'll show under Dependent Tasks on the project in Coordinator.");
+  render();
 }
 
 function render() {
@@ -66,6 +164,7 @@ function render() {
     case "detail":    root.innerHTML = renderDetailPage(); break;
     default:          root.innerHTML = renderCategoryPicker();
   }
+  if (S._dtModalOpen) { root.innerHTML += renderDepTaskModalP(); }
   // After the quotation form mounts, wire up the inline Project Details
   // section: show it if already awarded, and refresh it whenever the two
   // gating fields (status / LPO received) change.
@@ -75,6 +174,13 @@ function render() {
     const lp = document.getElementById("qf-lpo_received");
     if (st) st.addEventListener("change", refreshProjectDetails);
     if (lp) lp.addEventListener("change", refreshProjectDetails);
+    // Fully awarded (Won + Email Confirmed + LPO Received) → read-only for
+    // everyone except Super Admin. The HTML already reflects this (locked
+    // banner, buttons swapped out), this disables the actual form controls.
+    const editingData = (S._editMode && S._editingQuotation) ? S._editingQuotation : {};
+    if (typeof _isQuotationLocked === "function" && _isQuotationLocked(editingData) && typeof _applyQuotationLock === "function") {
+      _applyQuotationLock();
+    }
   }
 }
 
@@ -86,11 +192,10 @@ function renderCategoryPicker() {
     { key:"Private Folder", icon:"💎", grad:"linear-gradient(135deg,#c084fc,#7c3aed)", soft:"#faf5ff", textCol:"#5b21b6",  desc:"Special / exceptional projects" },
   ];
   const counts = S._catCounts || {};
+  const allTotal = Object.values(counts).reduce((s,n) => s + (n||0), 0);
   return `<div class="pbar-header">
     <div class="pbar-label">📋 Proposals · ${esc(getCompany().short)} <span style="font-weight:400;color:#8898aa;font-size:12px">— ${esc(CURRENT_USER?.name||"")}</span></div>
     <div style="display:flex;gap:7px">
-      <button class="btn btn-sm" style="background:#f0f2f5;color:#555;font-weight:600"
-        onclick="openTypeList('')">📂 All Quotations</button>
       ${CURRENT_USER?.role==="super_admin"?`<button class="btn btn-sm" style="background:#f4f0fd;color:#6d28d9;font-weight:600"
         onclick="openActivityLog('Proposals')">🕘 Log</button>`:""}
     </div>
@@ -101,6 +206,19 @@ function renderCategoryPicker() {
       <div style="font-size:12.5px;color:#8898aa;margin-top:2px">Choose a category to view existing quotations or start a new one.</div>
     </div>
     <div class="cat-grid">
+      <div class="cat-card">
+        <div class="cat-card-head" style="background:linear-gradient(135deg,#64748b,#334155)">
+          <span class="cat-card-ico">📂</span>
+          <span class="cat-card-count">${allTotal||""}</span>
+        </div>
+        <div class="cat-card-body">
+          <div class="cat-card-name">All Quotations</div>
+          <div class="cat-card-desc">Every category, in one combined list</div>
+        </div>
+        <div class="cat-card-actions">
+          <button class="cat-btn cat-btn-view" onclick="openTypeList('')">View All${allTotal?` (${allTotal})`:""}</button>
+        </div>
+      </div>
       ${cats.map(c => {
         const n = counts[c.key];
         const openN = (S._openCounts || {})[c.key];
@@ -144,7 +262,7 @@ function renderNewForm() {
 // Open a quotation's detail by id (looks it up from the loaded list).
 // Avoids embedding record JSON in an onclick attribute, which broke when
 // fields contained quotes/apostrophes/HTML.
-function openDetail(id) {
+async function openDetail(id) {
   const rec = (S._listRecords || []).find(x => x.id === id);
   if (!rec) { S.proposalTab = "list"; render(); return; }
   // Ensure category is set (records carry _cat from the list loader).
@@ -152,6 +270,18 @@ function openDetail(id) {
   S._editingQuotation = rec;
   S.proposalTab = "detail";
   render();
+  // Load the linked project (for the Project Coordinator link) in the
+  // background — for a revision, its PARENT project carries the assignee.
+  S._linkedProject = null; S._revParentProject = null;
+  try {
+    const proj = await fbGet(coPath("projects/proj_" + id), { fresh: true });
+    if (proj) S._linkedProject = proj;
+    if (rec.is_revision && rec.parent_project_id) {
+      const parent = await fbGet(coPath("projects/" + rec.parent_project_id), { fresh: true });
+      if (parent) S._revParentProject = parent;
+    }
+  } catch (e) {}
+  if (S.proposalTab === "detail" && S._editingQuotation === rec) render();
 }
 
 function editQuotation() {
@@ -169,6 +299,7 @@ function editQuotation() {
 }
 
 // category = "" means all types; otherwise a single type key like "Fitout Folder"
+let PROP_PROJECTS_BY_ID = {};
 async function loadListPage(category) {
   if (category !== undefined) S._listCategory = category;
   document.getElementById("app").innerHTML = `<div class="loading"><div class="spinner"></div></div>`;
@@ -189,6 +320,10 @@ async function loadListPage(category) {
       ...Object.values(priv||{}).map(r=>({...r,_cat:"Private Folder"})),
     ];
   }
+  // Load every project once so each quotation card can show its Project
+  // Coordinator (a project-level field). All quotations that share a
+  // project (original + its revisions) resolve to the same project id.
+  try { PROP_PROJECTS_BY_ID = (await fbGet(coPath("projects"))) || {}; } catch (e) { PROP_PROJECTS_BY_ID = {}; }
   // Sort by folder number (the numeric part of the quotation number, or the
   // folder_ref for revision quotations), ascending.
   const folderNum = (r) => {
@@ -210,6 +345,29 @@ function propDisplayName(r) {
   return folder ? (folder + "_" + name) : name;
 }
 // mode "open" pre-filters to Open status; both sort by folder number.
+// "+ New" from the All Quotations view has no single category to create
+// against (unlike a category-specific list) — show a quick picker instead
+// of silently doing nothing.
+function _pickCategoryForNewQuotation() {
+  const cats = [
+    { key:"Fitout Folder",  icon:"🏬", label:"Fitout" },
+    { key:"Live Folder",    icon:"🏗", label:"Live" },
+    { key:"ID Folder",      icon:"🛋", label:"ID" },
+    { key:"Private Folder", icon:"💎", label:"Private" },
+  ];
+  const host = document.createElement("div");
+  host.innerHTML = `<div class="overlay" onclick="if(event.target===this)this.remove()">
+    <div class="modal" style="max-width:340px;text-align:center">
+      <div style="font-weight:700;font-size:15px;margin-bottom:14px">Which category is this quotation for?</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        ${cats.map(c => `<button class="btn btn-sm" style="padding:12px;background:var(--surface-2);font-size:13px" onclick="this.closest('.overlay').remove();startNewQuotation('${c.key}')">${c.icon} ${c.label}</button>`).join("")}
+      </div>
+      <button class="btn btn-sm" style="margin-top:14px;background:transparent;color:var(--text-muted)" onclick="this.closest('.overlay').remove()">Cancel</button>
+    </div>
+  </div>`;
+  document.body.appendChild(host.firstElementChild);
+}
+
 function openTypeList(category, mode){
   S.filterStatus = (mode === "open") ? "Open" : "all";
   loadListPage(category);
@@ -218,7 +376,9 @@ function openTypeList(category, mode){
 function renderListPage() {
   const records=S._listRecords||[];
   let filtered=records.filter(r=>{
-    if(S.filterStatus!=="all"&&r.open_status!==S.filterStatus)return false;
+    if(S.filterStatus!=="all"&&S.filterStatus==="Open"&&r.open_status!=="Open"&&r.open_status)return false;
+    if(S.filterStatus!=="all"&&S.filterStatus!=="Open"&&r.open_status!==S.filterStatus)return false;
+    if(S.filterEnquiryStatus&&S.filterEnquiryStatus!=="all"&&r.qtn_status!==S.filterEnquiryStatus)return false;
     if(S.filterIncharge!=="all"&&r.proposal_incharge!==S.filterIncharge)return false;
     if(S.filterSearch){const q=S.filterSearch.toLowerCase();if(!(r.proj_name||"").toLowerCase().includes(q)&&!(r.client_name||"").toLowerCase().includes(q)&&!(r.qtn_number||"").toLowerCase().includes(q)&&!(r.location||"").toLowerCase().includes(q))return false;}
     return true;
@@ -227,13 +387,52 @@ function renderListPage() {
   const totalNet=filtered.filter(r=>["Converted","Won"].includes(r.open_status)).reduce((s,r)=>s+(parseFloat(r.net_amount)||0),0);
   const statusColor=s=>({Converted:"chip-done",Won:"chip-done",Open:"chip-active",Lost:"chip-not-approved",Closed:"chip-new"}[s]||"chip-new");
   const catColors={"Fitout Folder":"#27ae60","Live Folder":"#5b8dee","ID Folder":"#e8a060","Private Folder":"#9b59b6"};
+  // Group quotations that belong to the SAME project (an original quotation
+  // + each of its revisions, linked via parent_project_id) so they render
+  // as ONE card with clickable quotation-number tags to hop between them,
+  // instead of separate, unrelated-looking cards.
+  const groupKey = r => (r.is_revision && r.parent_project_id) ? r.parent_project_id : ("proj_" + r.id);
+  const groups = {}, groupOrder = [];
+  filtered.forEach(r => {
+    const key = groupKey(r);
+    if (!groups[key]) { groups[key] = []; groupOrder.push(key); }
+    groups[key].push(r);
+  });
+  // One detailed row per quotation: Status / Coordinator / Type / Original-or-RevisionN.
+  const qtnRow = (rec, label, projId) => {
+    const proj = PROP_PROJECTS_BY_ID[projId];
+    const coordVal = (proj && proj.project && proj.project.coordinator) || "";
+    const coordName = coordVal ? (typeof resolveUserName==="function" ? resolveUserName(coordVal) : coordVal) : "—";
+    const typeLabel = (rec._cat||"").replace(" Folder","");
+    return `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:5px 0;border-bottom:1px solid #f2f2f2;cursor:pointer" onclick="event.stopPropagation();openDetail('${rec.id}')">
+      <span style="font-size:11px;font-weight:700;color:${label==='Original'?'#1a5276':'#a06b00'};min-width:78px">${label==='Original'?'📄':'🔄'} ${esc(rec.qtn_number)}</span>
+      <span style="font-size:11px;color:#555">Status=<b style="color:#222">${esc(rec.open_status||"Open")}</b></span>
+      <span style="font-size:11px;color:#555">Coordinator=<b style="color:#222">${esc(coordName)}</b></span>
+      <span style="font-size:11px;color:#555">Type=<b style="color:#222">${esc(typeLabel)}</b></span>
+      <span style="font-size:10px;font-weight:600;color:#888;margin-left:auto">${esc(label)}</span>
+    </div>`;
+  };
+
   return `<div class="pbar-header">
     <div class="pbar-label">📂 ${S._listCategory ? catLabel(S._listCategory) : "All"} Quotations (${filtered.length})</div>
     <div style="display:flex;gap:7px">
-      <button class="btn btn-sm btn-gold" onclick="${S._listCategory ? `startNewQuotation('`+S._listCategory+`')` : `openTypeList('')`};">+ New</button>
+      <button class="btn btn-sm btn-gold" onclick="${S._listCategory ? `startNewQuotation('`+S._listCategory+`')` : `_pickCategoryForNewQuotation()`};">+ New</button>
       <button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:#ddd" onclick="loadListPage()">↻</button>
     </div>
   </div>
+  ${(() => {
+    const cTotal = records.length;
+    const cOpen  = records.filter(r => r.open_status === "Open" || !r.open_status).length;
+    const cNotSent = records.filter(r => r.qtn_status === "Yet to be Sent").length;
+    const cWon  = records.filter(r => r.open_status === "Won").length;
+    const tiles = [
+      { n: cTotal,   l: "Total",             icon: "📂", c: "#0d2137", active: S.filterStatus==="all"&&S.filterEnquiryStatus==="all", onclick: "S.filterStatus='all';S.filterEnquiryStatus='all';render()" },
+      { n: cOpen,    l: "Quotation Not Sent",icon: "🔓", c: "#1a5fb4", active: S.filterStatus==="Open", onclick: "S.filterStatus='Open';S.filterEnquiryStatus='all';render()" },
+      { n: cNotSent, l: "Enquiry Not Sent",  icon: "✉️", c: "#a06b00", active: S.filterEnquiryStatus==="Yet to be Sent", onclick: "S.filterStatus='all';S.filterEnquiryStatus='Yet to be Sent';render()" },
+      { n: cWon,     l: "Won",               icon: "🏆", c: "#166a3f", active: S.filterStatus==="Won", onclick: "S.filterStatus='Won';S.filterEnquiryStatus='all';render()" },
+    ];
+    return `<div style="background:#fff;padding:14px 18px;border-bottom:1px solid #e5e5e5">${renderStatTiles(tiles,{minPx:110})}</div>`;
+  })()}
   <div style="padding:10px 18px;background:#fff;border-bottom:1px solid #e5e5e5;display:flex;gap:14px;overflow-x:auto">
     <div style="margin-left:auto;text-align:right;flex-shrink:0">
       <div style="font-size:14px;font-weight:700;color:#166a3f">AED ${fmtMoney(totalNet)}</div>
@@ -258,24 +457,29 @@ function renderListPage() {
   </div>
   <div style="padding:10px 18px">
     ${!filtered.length?`<div style="text-align:center;padding:40px;color:#aaa;font-size:13px">No quotations match.</div>`:""}
-    ${filtered.map(r=>{const col=catColors[r._cat]||"#999";return `<div class="prop-card" style="cursor:pointer;border-left:4px solid ${col}"
-      onclick="openDetail('${r.id}')">
+    ${groupOrder.map(key=>{
+      const recs = groups[key].slice().sort((a,b)=>(a.createdAt||"").localeCompare(b.createdAt||""));
+      const primary = recs.find(r=>!r.is_revision) || recs[0];
+      const others = recs.filter(r=>r!==primary);
+      const col=catColors[primary._cat]||"#999";
+      const projId = key; // groupKey already resolves to the shared project id
+      return `<div class="prop-card" style="cursor:default;border-left:4px solid ${col}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
-        <div style="flex:1">
-          <div class="prop-card-title">${esc(propDisplayName(r))}</div>
-          <div class="prop-card-meta">${esc(r.client_name||"—")} · ${esc(r.location||"—")}</div>
-          ${r.createdBy?`<div style="font-size:10px;color:#aaa;margin-top:2px">by ${esc(r.createdBy)}${r.lastEditedBy&&r.lastEditedBy!==r.createdBy?` · edited by ${esc(r.lastEditedBy)}`:r.lastEditedAt?` · edited`:""}</div>`:""}
-          <div style="margin-top:5px;display:flex;gap:5px;flex-wrap:wrap">
-            <span class="status-chip" style="background:#e8f4ff;color:#1a5276">📄 ${esc(r.qtn_number)}</span>
-            <span class="status-chip ${statusColor(r.open_status)}">${esc(r.open_status||"Open")}</span>
-            <span style="background:${col}22;color:${col};font-size:10px;padding:2px 8px;border-radius:8px;font-weight:600">${(r._cat||"").replace(" Folder","")}</span>
-          </div>
+        <div style="flex:1;cursor:pointer" onclick="openDetail('${primary.id}')">
+          <div class="prop-card-title">${esc(propDisplayName(primary))}</div>
+          <div class="prop-card-meta">${esc(primary.client_name||"—")} · ${esc(primary.location||"—")}</div>
+          ${primary.createdBy?`<div style="font-size:10px;color:#aaa;margin-top:2px">by ${esc(primary.createdBy)}${primary.lastEditedBy&&primary.lastEditedBy!==primary.createdBy?` · edited by ${esc(primary.lastEditedBy)}`:primary.lastEditedAt?` · edited`:""}</div>`:""}
         </div>
         <div style="text-align:right;flex-shrink:0">
-          <div style="font-size:15px;font-weight:700;color:#166a3f">AED ${fmtMoney(r.net_amount||0)}</div>
+          <div style="font-size:15px;font-weight:700;color:#166a3f">AED ${fmtMoney(primary.net_amount||0)}</div>
         </div>
       </div>
-    </div>`;}).join("")}
+      <div style="margin-top:6px">
+        ${qtnRow(primary, "Original", projId)}
+        ${others.map((r,i)=>qtnRow(r, "Revision"+(i+1), projId)).join("")}
+      </div>
+    </div>`;
+    }).join("")}
   </div>
   <div class="footer">Winner Holistic Consultants · Proposals · <a href="/auth/" style="color:#888">Logout</a></div>`;
 }
@@ -286,9 +490,13 @@ function renderDetailPage() {
   const col=catColors[r.category]||"#0d2137";
   const fields=getCategoryFields(r.category).flatMap(g=>g.fields);
   return `<div class="pbar-header">
-    <div class="pbar-label" style="cursor:pointer" onclick="S.proposalTab='list';render()">← ${esc(r.qtn_number)}</div>
+    <div class="pbar-label" style="cursor:pointer;font-family:'SF Mono',Consolas,Menlo,monospace;letter-spacing:0.3px" onclick="S.proposalTab='list';render()">← ${esc(r.qtn_number)}</div>
     <div style="display:flex;gap:7px">
-      <button class="btn btn-sm btn-gold" onclick="editQuotation()">${svgIcon('edit',13,'currentColor')} Edit</button>
+      ${((r.open_status||"").toLowerCase()==="won" && (r.email_confirm||"").toUpperCase()==="Y")
+        ? `<button class="btn btn-sm" style="background:#eef0ff;color:#5b3df5" onclick="openDepTaskModalFromProposals('${esc(typeof deriveProjectIdForQuotation==='function'?deriveProjectIdForQuotation(r):'')}')">🔗 Raise Task</button>` : ""}
+      ${(typeof _isQuotationLocked === "function" && _isQuotationLocked(r))
+        ? `<span class="btn btn-sm" style="background:#f3f3f7;color:#999;cursor:default">🔒 Locked (Super Admin only)</span>`
+        : `<button class="btn btn-sm btn-gold" onclick="editQuotation()">${svgIcon('edit',13,'currentColor')} Edit</button>`}
     </div>
   </div>
   <div class="body">
@@ -301,10 +509,31 @@ function renderDetailPage() {
         <span style="background:${col}22;color:${col};padding:4px 12px;border-radius:10px;font-size:12px;font-weight:700">${esc(catLabel(r.category||""))}</span>
       </div>
       <div class="fgrid">
-        ${fields.map(f=>`<div ${f.full?'style="grid-column:1/-1"':""}>
+        ${fields.map(f=>{
+          if (f.type === "coord_display") {
+            const linkedProj = S._revParentProject || S._linkedProject;
+            const coordVal = (linkedProj && linkedProj.project && linkedProj.project.coordinator) || "";
+            const coordName = coordVal ? (typeof resolveUserName === "function" ? resolveUserName(coordVal) : coordVal) : "";
+            const coordIsEmail = /@/.test(coordVal);
+            const display = coordVal
+              ? `<a href="mailto:${esc(coordIsEmail ? coordVal : '')}" style="color:#5b3df5;text-decoration:none;font-weight:600">👤 ${esc(coordName)}${coordIsEmail ? ' ↗' : ''}</a>`
+              : `<span style="color:#bbb">— Not assigned yet</span>`;
+            return `<div>
+              <div class="fl">${esc(f.label)}</div>
+              <div style="font-size:13px;padding:5px 0;border-bottom:1px solid #f0f0f0">${display}</div>
+            </div>`;
+          }
+          if (f.allowDepartment && (r[f.id]||"").startsWith("dept:")) {
+            return `<div ${f.full?'style="grid-column:1/-1"':""}>
+            <div class="fl">${esc(f.label)}</div>
+            <div style="font-size:13px;padding:5px 0;border-bottom:1px solid #f0f0f0">🏢 ${esc(r[f.id].slice(5))} <span style="color:#aaa;font-size:11px">(team)</span></div>
+            </div>`;
+          }
+          return `<div ${f.full?'style="grid-column:1/-1"':""}>
           <div class="fl">${esc(f.label)}</div>
           <div style="font-size:13px;color:#222;padding:5px 0;border-bottom:1px solid #f0f0f0">${esc(r[f.id]||"—")}</div>
-        </div>`).join("")}
+        </div>`;
+        }).join("")}
       </div>
     </div>
     ${r.attachment && r.attachment.url ? `

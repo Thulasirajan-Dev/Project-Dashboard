@@ -38,4 +38,12 @@ return [
     //    unencrypted. Flip back to true once HTTPS/AutoSSL is working.
     'COOKIE_SECURE' => false,
 
+    // ── Automated database backups (api/backup.php) ───────
+    // A long random string used to authorize a cPanel Cron Job to trigger
+    // a backup WITHOUT a logged-in session (cron can't hold a browser
+    // cookie). Generate one yourself — e.g. run this once and paste the
+    // result in: php -r "echo bin2hex(random_bytes(24));"
+    // Treat it like a password: only your cron job command should know it.
+    'BACKUP_TOKEN' => 'CHANGE_ME_TO_A_LONG_RANDOM_STRING',
+
 ];

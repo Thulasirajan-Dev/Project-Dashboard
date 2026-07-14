@@ -14,9 +14,12 @@ function _projMilestones(p) {
     (g.milestones || []).forEach(m => {
       out.push({
         name: m.name || "Milestone",
-        amount: Number(m.amount) || Math.round(gt * (Number(m.pct) || 0) / 100),
+        // Always recompute live from the CURRENT contractTotal and pct
+        // rather than trusting the stored m.amount snapshot — see the same
+        // fix in account.js _allMilestoneRows() for why.
+        amount: milestoneAmount(m, gt),
         pct: Number(m.pct) || 0,
-        status: m.status === "credited" ? "credited" : "pending",
+        status: m.status || "",
         stageStatus: m.stageStatus || "Not started",
         dateRaised: m.dateRaised || "",
         creditedDate: m.creditedDate || "",
@@ -41,7 +44,7 @@ function _milestoneTotals(list) {
 
 async function loadAndRenderPayments() {
   document.getElementById("app").innerHTML =
-    `<div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">Loading milestones…</div></div>`;
+    `<div class="loading"><div class="spinner"></div><div style="font-size:13px;color:var(--text-muted)">Loading milestones…</div></div>`;
 
   const projects = await fbGet("projects", { fresh: true }) || {};
   const rows = Object.values(projects).map(p => {
@@ -150,26 +153,26 @@ function renderPayments() {
     <input type="date" class="range-input" value="${esc(S.fromDate)}" onchange="S.fromDate=this.value;renderPayments()"/>
     <span class="range-lbl">To</span>
     <input type="date" class="range-input" value="${esc(S.toDate)}" onchange="S.toDate=this.value;renderPayments()"/>
-    ${rangeActive()?`<button data-vo-safe class="btn btn-sm" style="background:#f0f0f0;color:#555" onclick="S.fromDate='';S.toDate='';renderPayments()">Clear</button>`:""}
+    ${rangeActive()?`<button data-vo-safe class="btn btn-sm" style="background:var(--surface-2);color:var(--text-muted)" onclick="S.fromDate='';S.toDate='';renderPayments()">Clear</button>`:""}
     <span class="range-now">${rangeLabel()}</span>
   </div>
 
   <!-- Overall totals -->
-  <div style="padding:14px 18px;background:#fff;border-bottom:1px solid #eee">
-    <div style="font-size:11px;color:#999;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">
+  <div style="padding:14px 18px;background:var(--surface);border-bottom:1px solid var(--border)">
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">
       ${ranged ? "Income credited " + rangeLabel() : "Overall"}
     </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px">
       ${[
         { n: fmtAED(tot.raised),   l: `Total Raised (${tot.projects} projects)`, c:"#1a5276", icon:"🧾" },
         { n: fmtAED(tot.credited), l: ranged ? "Credited In Range" : "Total Credited", c:"#166a3f", icon:"✅" },
         { n: fmtAED(tot.pending),  l: "Total Pending",                           c:"#a06b00", icon:"⏳" },
         { n: overallRate+"%",      l: "Collection Rate",                         c:"#7b3fb8", icon:"📊" }
       ].map(k => `
-        <div style="background:#f8f9fb;border:1px solid #eee;border-radius:10px;padding:12px;text-align:center">
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
           <div style="font-size:18px;margin-bottom:4px">${k.icon}</div>
           <div style="font-size:19px;font-weight:700;color:${k.c}">${k.n}</div>
-          <div style="font-size:10px;color:#999;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">${k.l}</div>
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">${k.l}</div>
         </div>`).join("")}
     </div>
   </div>
@@ -190,13 +193,13 @@ function renderPayments() {
       <option value="credited" ${S.sortBy==="credited"?"selected":""}>Sort: Credited ↓</option>
       <option value="name" ${S.sortBy==="name"?"selected":""}>Sort: Name A–Z</option>
     </select>
-    <div style="margin-left:auto;font-size:12px;color:#999;align-self:center">${view.length} projects</div>
+    <div style="margin-left:auto;font-size:12px;color:var(--text-muted);align-self:center">${view.length} projects</div>
   </div>
 
   <div style="padding:10px 16px 50px">`;
 
   if (!view.length) {
-    h += `<div style="padding:50px;text-align:center;color:#999;font-size:13px">
+    h += `<div style="padding:50px;text-align:center;color:var(--text-muted);font-size:13px">
       No projects with milestones match. Projects appear here once a quotation is awarded.</div>`;
   }
 
@@ -221,7 +224,8 @@ function renderPayments() {
         <summary>View ${r.count} milestone${r.count!==1?"s":""}</summary>
         <div class="pay-lpo-list">
           ${r.lpos.map(l => {
-            const credited = l.status === "credited";
+            const stName = accountStatus(l);
+            const stSty = ACCOUNT_STATUS_STYLE[stName];
             return `<div class="pay-lpo-row">
               <div style="flex:1">
                 <div class="pay-lpo-name">${esc(l.name||"LPO")}</div>
@@ -229,7 +233,7 @@ function renderPayments() {
               </div>
               <div style="text-align:right">
                 <div class="pay-lpo-amt">${fmtAED(l.amount)}</div>
-                <span class="pay-lpo-chip" style="background:${credited?"#1f5135":"#5a4a1f"};color:${credited?"#9be8bb":"#f0d080"}">${credited?"✓ Credited":"⏳ Pending"}</span>
+                <span class="pay-lpo-chip" style="background:${stSty.bg};color:${stSty.color}">${stSty.icon} ${stName}</span>
               </div>
             </div>`;
           }).join("")}
@@ -242,7 +246,7 @@ function renderPayments() {
   });
 
   h += `</div>
-  <div class="footer">Winner Holistic Consultants · Milestone Dashboard · <a href="/auth/" style="color:#888">Portal</a></div>`;
+  <div class="footer">Winner Holistic Consultants · Milestone Dashboard · <a href="/auth/" style="color:var(--text-muted)">Portal</a></div>`;
 
   document.getElementById("app").innerHTML = h;
   setupScrollTop();

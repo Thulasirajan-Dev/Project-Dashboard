@@ -3,16 +3,26 @@
    style.css — Final Consolidated
 ============================================================ */
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'DM Sans',sans-serif;background:#f0f2f5;min-height:100vh}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);min-height:100vh;color:var(--text)}
 input,select,button,textarea{font-family:inherit}
-#app{max-width:780px;margin:0 auto;background:#f0f2f5;min-height:100vh}
+#app{max-width:780px;margin:0 auto;background:var(--bg);min-height:100vh}
+/* Wide-content mode — for admin views (Manage Users, Backups, Permissions
+   matrix) that don't have a real sidebar but still need full screen width
+   for their tables, instead of being capped at the narrow 780px default
+   meant for simple stacked forms. */
+body.wide-content #app{max-width:none;margin:0}
 
 /* ── LANDING ── */
-.landing-hero{background:linear-gradient(150deg,#2e1065 0%,#4c1d95 55%,#6d28d9 120%);padding:40px 24px 36px;text-align:center;position:relative;overflow:hidden}
-.landing-hero::before{content:'';position:absolute;top:-40px;right:-40px;width:200px;height:200px;border-radius:50%;background:rgba(201,167,82,0.06);pointer-events:none}
-.landing-hero::after{content:'';position:absolute;bottom:-60px;left:-40px;width:250px;height:250px;border-radius:50%;background:rgba(201,167,82,0.04);pointer-events:none}
-.landing-logo-mark{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#c9a752,#f0d080);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:22px;box-shadow:0 8px 24px rgba(201,167,82,0.35)}
-.landing-brand{font-size:30px;letter-spacing:3px;color:#c9a752;text-transform:uppercase;font-weight:600;margin-bottom:8px;opacity:0.8}
+.landing-hero{
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px, transparent 1px, transparent 28px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px, transparent 1px, transparent 28px),
+    linear-gradient(150deg,var(--sun3) 0%,var(--sun2) 55%,var(--sun1) 120%);
+  padding:40px 24px 36px;text-align:center;position:relative;overflow:hidden}
+.landing-hero::before{content:'';position:absolute;top:-40px;right:-40px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,0.05);pointer-events:none}
+.landing-hero::after{content:'';position:absolute;bottom:-60px;left:-40px;width:250px;height:250px;border-radius:50%;background:rgba(255,255,255,0.04);pointer-events:none}
+.landing-logo-mark{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--gold1),var(--gold2));display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:22px;box-shadow:0 8px 24px rgba(0,0,0,0.25)}
+.landing-brand{font-size:30px;letter-spacing:3px;color:var(--gold2);text-transform:uppercase;font-weight:600;margin-bottom:8px;opacity:0.9}
 .landing-title{font-family:'DM Sans',sans-serif;font-size:26px;font-weight:700;color:#fff;margin-bottom:6px;line-height:1.2}
 .landing-sub{font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:0}
 .landing-body{padding:28px 20px;background:#f0f2f5}
@@ -89,41 +99,49 @@ input,select,button,textarea{font-family:inherit}
 /* ── MISC ── */
 .nb{background:#fff8e6;border:1px solid #e8c96a;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:11px;color:#7a5800;line-height:1.7}
 .nb-fb{background:#fdf0e6;border:1px solid #e8a060;color:#7a3800}
-.footer{text-align:center;padding:14px;font-size:11px;color:#bbb;border-top:1px solid #eee;background:#fff}
+.footer{text-align:center;padding:14px;font-size:11px;color:var(--text-faint);border-top:1px solid var(--border-soft);background:var(--surface)}
 
 /* ── BUTTONS ── */
 .btn{padding:6px 13px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;border:none;transition:all 0.15s}
 .btn:hover{opacity:0.88;transform:translateY(-1px)}
-.btn-gold{background:linear-gradient(135deg,#c9a752,#e8c76a);color:#0d2137}
-.btn-navy{background:#1a3a5c;color:#c9a752}
-.btn-out{background:transparent;border:1.5px solid rgba(201,167,82,0.5);color:#c9a752}
+.btn-gold{background:linear-gradient(135deg,var(--gold1),var(--gold2));color:var(--gold-ink)}
+.btn-navy{background:#1a3a5c;color:var(--gold1)}
+.btn-out{background:transparent;border:1.5px solid rgba(201,167,82,0.5);color:var(--gold1)}
 .btn-red{background:#fde8e8;color:#a32d2d}
 .btn-green{background:#d4f0e3;color:#166a3f}
 .btn-purple{background:linear-gradient(135deg,#6d28d9,#7c3aed);color:#fff}
 .btn-sm{padding:4px 10px;font-size:11px}
-.btn-add{width:100%;padding:8px;background:#f7f7f7;border:1px dashed #ccc;border-radius:6px;color:#666;font-size:12px;cursor:pointer;margin-top:7px;text-align:center;transition:all 0.15s}
-.btn-add:hover{background:#fff8e6;border-color:#c9a752;color:#a06b00}
+.btn-add{width:100%;padding:8px;background:var(--surface-2);border:1px dashed #ccc;border-radius:6px;color:var(--text-muted);font-size:12px;cursor:pointer;margin-top:7px;text-align:center;transition:all 0.15s}
+.btn-add:hover{background:#fff8e6;border-color:var(--gold1);color:#a06b00}
 .btn-add-prep{border-color:#5b8dee;color:#1a5276}
-.btn-add-approval{border-color:#c9a752;color:#a06b00}
+.btn-add-approval{border-color:var(--gold1);color:#a06b00}
 .btn-del{background:none;border:none;color:#e24b4a;cursor:pointer;font-size:15px;padding:2px 6px}
 .btn-del-sm{background:#fde8e8;color:#a32d2d;border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer}
 
 /* ── BARS ── */
-.cbar{background:#0d2137;padding:11px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
-.clabel{font-size:12px;color:#c9a752;font-weight:600}
-.pbar-header{background:linear-gradient(135deg,#2d1b69,#4c1d95);padding:11px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.cbar{background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 22px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 22px),
+    var(--sun3);
+  padding:calc(11px * var(--pad-scale)) 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.clabel{font-size:12px;color:var(--gold1);font-weight:600}
+.pbar-header{background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 22px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 22px),
+    linear-gradient(135deg,var(--sun3),var(--sun2));
+  padding:calc(11px * var(--pad-scale)) 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
 .pbar-label{font-size:12px;color:#c4b5fd;font-weight:600}
 
 /* ── FORMS ── */
-.sbox{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,0.04)}
-.sbox-title{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#aaa;font-weight:700;margin-bottom:12px}
+.sbox{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--sun1);border-radius:10px 10px 12px 12px;padding:calc(16px * var(--pad-scale));margin-bottom:calc(12px * var(--pad-scale));box-shadow:var(--shadow-card)}
+.sbox-title{font-size:calc(10px * var(--font-scale));letter-spacing:1px;text-transform:uppercase;color:var(--text-faint);font-weight:700;margin-bottom:calc(12px * var(--pad-scale))}
 .sbox-fb{border-color:#e8c090}
 .sbox-title-fb{color:#a04800}
-.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:calc(10px * var(--pad-scale))}
 .ff{grid-column:1/-1}
-.fl{font-size:11px;color:#555;margin-bottom:4px;font-weight:600}
-.fi{width:100%;padding:8px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;color:#222;background:#fff;transition:border-color 0.15s}
-.fi:focus{outline:none;border-color:#c9a752;box-shadow:0 0 0 3px rgba(201,167,82,0.1)}
+.fl{font-size:calc(11px * var(--font-scale));color:var(--text-muted);margin-bottom:4px;font-weight:600}
+.fi{width:100%;padding:calc(8px * var(--pad-scale)) 11px;border:1.5px solid var(--input-border);border-radius:8px;font-size:calc(13px * var(--font-scale));color:var(--input-text);background:var(--input-bg);transition:border-color 0.15s}
+.fi:focus{outline:none;border-color:var(--gold1);box-shadow:0 0 0 3px rgba(201,167,82,0.1)}
 .req-star{color:#e24b4a;font-weight:700;margin-left:1px}
 
 /* PROJECT INFO CUSTOM TITLES */
@@ -134,6 +152,9 @@ input,select,button,textarea{font-family:inherit}
 .se{display:flex;gap:7px;align-items:flex-start;padding:9px;border-radius:8px;margin-bottom:6px;background:#f7f7f7;border:1px solid #eee;cursor:grab}
 .se.dragging{opacity:0.4}
 .se.drag-over{border:2px dashed #c9a752;background:#fff8e6}
+.scope-drag-row.scope-row-dragging{opacity:0.4}
+.scope-drag-row.scope-row-over{outline:2px dashed #c9a752;outline-offset:-2px;background:#fff8e6}
+.scope-drag-handle:active{cursor:grabbing}
 .se-selected{border-color:#c9a752;background:#fff8e6}
 .se-check{width:16px;height:16px;margin-top:5px;flex-shrink:0;accent-color:#c9a752;cursor:pointer}
 .se-drag-handle{font-size:16px;color:#ccc;cursor:grab;padding:2px 4px;flex-shrink:0;margin-top:2px}
@@ -193,7 +214,7 @@ input,select,button,textarea{font-family:inherit}
 
 /* ── MODALS ── */
 .overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:999;padding:16px;backdrop-filter:blur(2px)}
-.modal{background:#fff;border-radius:16px;padding:24px;width:360px;max-width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+.modal{background:var(--surface);border-radius:16px;padding:24px;width:360px;max-width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);color:var(--text)}
 .modal h3{font-size:15px;font-weight:600;margin-bottom:5px;color:#1a1a1a}
 .modal p{font-size:12px;color:#666;margin-bottom:14px;line-height:1.5}
 .modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
@@ -203,7 +224,7 @@ input,select,button,textarea{font-family:inherit}
 
 /* ── LOGIN ── */
 .login-wrap{padding:40px 20px;display:flex;align-items:center;justify-content:center;min-height:400px}
-.login-box{background:#fff;border-radius:16px;padding:28px;width:320px;box-shadow:0 8px 32px rgba(0,0,0,0.12)}
+.login-box{background:var(--surface);border-radius:16px;padding:28px;width:320px;box-shadow:0 8px 32px rgba(0,0,0,0.12);color:var(--text)}
 .coord-name-box{background:#fff;border-radius:16px;padding:28px;width:340px;box-shadow:0 8px 32px rgba(0,0,0,0.12)}
 
 /* ── LOADING ── */
@@ -319,9 +340,46 @@ input,select,button,textarea{font-family:inherit}
 .kpi-proposal .kpi-num{color:#4a1fb8}
 .kpi-reapp .kpi-num{color:#a04800}
 
+/* ── Pictorial stat tiles (Coordinator/Account/Proposals dashboards) ── */
+.stat-tile{
+  background: linear-gradient(160deg, #ffffff, #f7f8fc);
+  border: 1px solid #edf0f7;
+  border-radius: 14px;
+  padding: 14px 8px 12px;
+  text-align: center;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(20,20,50,0.05);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+.stat-tile::before{
+  content:""; position:absolute; top:0; left:0; right:0; height:3px;
+  background: var(--tile-color, #999);
+  opacity:0.85;
+}
+.stat-tile:hover{
+  transform: translateY(-3px);
+  box-shadow: 0 10px 22px rgba(20,20,50,0.10);
+  border-color: var(--tile-color, #ccc);
+}
+.stat-tile:active{ transform: translateY(-1px) scale(0.97); }
+.stat-tile.stat-tile-on{
+  border-color: var(--tile-color, #999);
+  background: linear-gradient(160deg, #ffffff, color-mix(in srgb, var(--tile-color, #999) 8%, #ffffff));
+  box-shadow: 0 4px 14px rgba(20,20,50,0.10);
+}
+.stat-tile-icon{
+  font-size: 19px; line-height:1; margin-bottom:5px;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.10));
+}
+.stat-tile-n{ font-size: 20px; font-weight: 800; color: var(--tile-color, #333); line-height: 1.1; }
+.stat-tile-l{ font-size: 9px; color: #8a8f9c; text-transform: uppercase; letter-spacing: 0.6px; margin-top: 4px; font-weight: 700; }
+@media(max-width:480px){ .stat-tile{ padding:11px 6px 9px } .stat-tile-icon{ font-size:16px } .stat-tile-n{ font-size:17px } }
+
 .dash-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:540px){.dash-row{grid-template-columns:1fr}}
-.dash-card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,0.04)}
+.dash-card{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--sun1);border-radius:10px 10px 12px 12px;padding:16px;box-shadow:var(--shadow-card);color:var(--text)}
 .dash-card-title{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#aaa;font-weight:700;margin-bottom:12px}
 .dash-empty{font-size:12px;color:#bbb;padding:10px 0;text-align:center}
 .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:9px;cursor:pointer;border-radius:6px;padding:2px 4px;transition:background 0.15s}
@@ -478,35 +536,12 @@ input,select,button,textarea{font-family:inherit}
 .pay-open{font-size:11.5px;color:#6d28d9;text-decoration:none;font-weight:600}
 .pay-open:hover{text-decoration:underline}
 
-/* ── Activity log overlay (light) ── */
-#whc-actlog-overlay{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;font-family:'DM Sans',system-ui,sans-serif}
-.actlog-backdrop{position:absolute;inset:0;background:rgba(13,33,55,0.4);backdrop-filter:blur(3px)}
-.actlog-panel{position:relative;width:min(680px,94vw);max-height:88vh;display:flex;flex-direction:column;background:#fff;border:1px solid #e8e8e8;border-radius:16px;box-shadow:0 24px 60px rgba(13,33,55,0.3);overflow:hidden}
-.actlog-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:18px 20px;background:linear-gradient(135deg,#0d2137,#1a3a5c);border-bottom:1px solid #e8e8e8}
-.actlog-title{font-size:17px;font-weight:700;color:#fff}
-.actlog-sub{font-size:11px;color:rgba(255,255,255,0.7);margin-top:2px}
-.actlog-close{background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:8px;width:30px;height:30px;font-size:14px;cursor:pointer}
-.actlog-close:hover{background:rgba(255,255,255,0.28)}
-.actlog-filters{display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid #eee;background:#fafafa}
-.actlog-sel,.actlog-search{background:#fff;color:#0d2137;border:1px solid #ddd;border-radius:8px;padding:8px 10px;font-size:12px;font-family:inherit}
-.actlog-search{flex:1}
-.actlog-sel:focus,.actlog-search:focus{outline:none;border-color:#c9a752}
-.actlog-refresh{background:#c9a752;color:#fff;border:none;border-radius:8px;width:36px;font-size:14px;font-weight:700;cursor:pointer}
-.actlog-clear{background:#fbe9e9;color:#a32d2d;border:1px solid #f0c4c4;border-radius:8px;padding:0 10px;height:34px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit}
-.actlog-clear:hover{background:#f8d7d7}
-.actlog-clear:focus{outline:none;border-color:#a32d2d}
-.actlog-body{overflow-y:auto;padding:6px 10px 14px}
-.actlog-loading,.actlog-empty{padding:40px;text-align:center;color:#aaa;font-size:13px}
-.actlog-row{display:flex;gap:11px;align-items:flex-start;padding:11px 10px;border-bottom:1px solid #f2f2f2}
-.actlog-row:last-child{border-bottom:none}
-.actlog-dot{width:9px;height:9px;border-radius:50%;margin-top:5px;flex-shrink:0}
-.actlog-main{flex:1;min-width:0}
-.actlog-line{font-size:13px;color:#0d2137}
-.actlog-meta{font-size:11px;color:#888;margin-top:3px}
-.actlog-modpill{padding:1px 7px;border-radius:7px;font-weight:600;margin-right:3px}
-.actlog-tag{font-size:9px;font-weight:700;padding:1px 6px;border-radius:6px;margin-left:6px;vertical-align:middle}
-.actlog-tag-edit{background:#ece4fb;color:#6d28d9}
-.actlog-time{font-size:10.5px;color:#aaa;white-space:nowrap;flex-shrink:0;margin-top:2px}
+/* Activity log panel: styled dynamically by injectActivityLogStyles() in
+   shared.js (dark "Splunk-style" panel, wide layout) — that's the single
+   source of truth. An older, narrower, light-themed version used to live
+   here too, using class names (.actlog-row/.actlog-dot/.actlog-modpill)
+   the current renderer doesn't even use anymore; removed to stop it
+   fighting the real styles for width/theme. */
 
 /* ── Date range bar (LPO Status & Summary) ── */
 .range-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 18px;background:#fff;border-bottom:1px solid #eee}
@@ -521,13 +556,60 @@ input,select,button,textarea{font-family:inherit}
    ============================================================ */
 :root{
   --sb-w: 248px;
-  --sun1:#8b5cf6;   /* light orange */
-  --sun2:#6d28d9;   /* mid */
-  --sun3:#4c1d95;   /* pink-ish bottom (subtle) */
+  --sun1:#2d6a9e;   /* blueprint — new default, deep technical blue */
+  --sun2:#1e4d78;   /* mid */
+  --sun3:#0f3355;   /* deep blueprint navy */
   --ink:#32325d;    /* primary text (Creative Tim navy-ink) */
   --ink-soft:#8898aa;
   --page:#f4f5f7;
+
+  /* ── Theme system: surfaces/text (light defaults) ── */
+  --bg:#f0f2f5; --surface:#ffffff; --surface-2:#f7f7f7; --surface-3:#f5f6fa;
+  --text:#1a2740; --text-muted:#6b7280; --text-faint:#9aa0ab;
+  --border:#e5e5e5; --border-soft:#eef0f3;
+  --input-bg:#ffffff; --input-border:#d6d9e2; --input-text:#222;
+  --gold1:#4a8dbf; --gold2:#7bb3d9; --gold-ink:#0a2540;
+  --navy:#0d2137;
+  --money-color:#166a3f; --highlight-row:#fffde7;
+  --shadow-card: 0 1px 4px rgba(0,0,0,0.04);
+  /* Density: 1 = comfortable (default), smaller = compact */
+  --pad-scale:1; --font-scale:1;
 }
+/* ── Dark mode — overrides surfaces/text. Accent hue stays the same
+   family across light/dark (brand identity shouldn't flip), but each
+   accent gets its own brighter/more-saturated variant here since the
+   muted light-mode shades go flat and low-contrast on a dark surface ── */
+[data-theme="dark"]{
+  --bg:#0e1116; --surface:#1e2530; --surface-2:#262e3b; --surface-3:#2c3543;
+  --text:#eef1f6; --text-muted:#adb4c2; --text-faint:#767e8c;
+  --border:#333c4a; --border-soft:#2a3240;
+  --input-bg:#232b38; --input-border:#3f4a5a; --input-text:#eef1f6;
+  --page:#0e1116; --ink:#eef1f6; --ink-soft:#adb4c2;
+  --money-color:#4fb37f; --highlight-row:#332c14;
+  --shadow-card: 0 2px 10px rgba(0,0,0,0.45);
+  /* Brightened default (Blueprint) accent for dark mode */
+  --sun1:#4a90c9; --sun2:#2d6a9e; --sun3:#1a3a5c;
+  --gold1:#6ba3d6; --gold2:#9bc4e8; --gold-ink:#0a1c2e;
+}
+/* ── Default accent — deep blueprint blue, matching architectural/
+   technical-drawing reference art rather than a decorative brand color.
+   Anyone with an old accent value (ocean/forest/royal/rose/charcoal)
+   still saved in their browser will now just see this new default, since
+   those preset names no longer have their own override rule. ── */
+[data-accent="classic"]{ --sun1:#8b5cf6; --sun2:#6d28d9; --sun3:#4c1d95; --gold1:#c9a752; --gold2:#e8c76a; --gold-ink:#0d2137; }
+[data-accent="slate"]{ --sun1:#7b8998; --sun2:#5b6b7d; --sun3:#3d4a5c; --gold1:#8896a3; --gold2:#aab4bd; --gold-ink:#1f2833; }
+[data-accent="concrete"]{ --sun1:#a39990; --sun2:#83776c; --sun3:#5c5249; --gold1:#b0a89f; --gold2:#cbc4bc; --gold-ink:#2b2620; }
+[data-accent="steel"]{ --sun1:#6b8299; --sun2:#4f6478; --sun3:#374856; --gold1:#7f97ab; --gold2:#a3b6c4; --gold-ink:#1a232c; }
+/* Dark-mode variants — brighter/more saturated so each accent stays
+   legible and vivid against the dark surface instead of going flat. */
+[data-theme="dark"][data-accent="classic"]{ --sun1:#a78bfa; --sun2:#8b5cf6; --sun3:#6d28d9; --gold1:#e0bd6e; --gold2:#f0d896; --gold-ink:#1a1030; }
+[data-theme="dark"][data-accent="slate"]{ --sun1:#9aa8b8; --sun2:#7b8998; --sun3:#5b6b7d; --gold1:#aab4bd; --gold2:#c6ccd2; --gold-ink:#131a20; }
+[data-theme="dark"][data-accent="concrete"]{ --sun1:#c4b8ac; --sun2:#a39990; --sun3:#83776c; --gold1:#cbc4bc; --gold2:#ddd7d0; --gold-ink:#1c1712; }
+[data-theme="dark"][data-accent="steel"]{ --sun1:#8aa0b8; --sun2:#6b8299; --sun3:#4f6478; --gold1:#a3b6c4; --gold2:#c0cdd7; --gold-ink:#10161c; }
+/* ── Density — Compact tightens padding/spacing/font-size app-wide via
+   these two multipliers, applied by the rules that opt in below. ── */
+[data-density="compact"]{ --pad-scale:0.7; --font-scale:0.92; }
+
 
 /* Page background + content shift — full width beside the sidebar */
 body.has-sidebar{background:var(--page)}
@@ -540,9 +622,18 @@ body.has-sidebar .back-portal-btn{display:none}
 
 /* ── Sidebar ── */
 .whc-sidebar{position:fixed;top:0;left:0;width:var(--sb-w);height:100vh;z-index:9000;
-  background:linear-gradient(160deg,var(--sun1) 0%,var(--sun2) 55%,var(--sun3) 120%);
-  display:flex;flex-direction:column;box-shadow:4px 0 24px rgba(76,29,149,0.18);
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.035) 0px, rgba(255,255,255,0.035) 1px, transparent 1px, transparent 26px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0px, rgba(255,255,255,0.035) 1px, transparent 1px, transparent 26px),
+    linear-gradient(160deg,var(--sun1) 0%,var(--sun2) 55%,var(--sun3) 120%);
+  display:flex;flex-direction:column;box-shadow:4px 0 24px rgba(0,0,0,0.18);
   font-family:'DM Sans',system-ui,sans-serif}
+[data-theme="dark"] .whc-sidebar{
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 26px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 26px),
+    linear-gradient(160deg,var(--sun3) 0%,#080a0e 130%);
+  box-shadow:4px 0 24px rgba(0,0,0,0.5)}
 .sb-brand{display:flex;align-items:center;gap:11px;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,0.18)}
 .sb-brand-mark{width:40px;height:40px;border-radius:11px;background:rgba(255,255,255,0.22);display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:14px;letter-spacing:0.5px;backdrop-filter:blur(4px)}
 .sb-brand-name{font-size:14px;font-weight:700;color:#fff;line-height:1.1}
@@ -576,8 +667,8 @@ body.has-sidebar .back-portal-btn{display:none}
 body.has-sidebar .pbar-header,
 body.has-sidebar .cbar,
 body.has-sidebar .hdr{
-  background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(50,50,93,0.08);
-  border-bottom:1px solid #eef0f3}
+  background:var(--surface);color:var(--ink);box-shadow:var(--shadow-card);
+  border-bottom:1px solid var(--border-soft)}
 body.has-sidebar .pbar-label,
 body.has-sidebar .clabel{color:var(--ink);font-weight:700}
 
@@ -591,8 +682,8 @@ body.has-sidebar .lpo-card,
 body.has-sidebar .prop-card,
 body.has-sidebar .auth-user-card,
 body.has-sidebar .auth-kpi{
-  background:#fff;border:none;border-radius:12px;
-  box-shadow:0 2px 6px rgba(50,50,93,0.08),0 1px 3px rgba(0,0,0,0.04)}
+  background:var(--surface);border:none;border-radius:12px;
+  box-shadow:var(--shadow-card)}
 
 /* Primary buttons take the sunset gradient */
 body.has-sidebar .btn-gold,
@@ -612,13 +703,12 @@ body.has-sidebar .sbox-title,
 body.has-sidebar .sec-label{color:var(--ink)}
 
 /* ── Full-screen layout refinements (with sidebar) ── */
-/* Forms & reading content shouldn't stretch ultra-wide; cap them for
-   readability while tables/dashboards still use the full width. */
 body.has-sidebar .body{padding:22px 26px}
-body.has-sidebar .sbox{max-width:920px}
-body.has-sidebar .quot-box{max-width:920px}
-/* The fee-summary / wide data sboxes can opt out if needed via .sbox-wide */
-body.has-sidebar .sbox-wide{max-width:none}
+/* .sbox previously capped at 920px "for readability" — removed: it was
+   leaving a large empty gap on normal wide monitors for content like
+   detail/field-grid views that don't actually need a narrow reading
+   width. .sbox-wide remains available as an explicit marker if a
+   specific box is meant to always go full width regardless. */
 
 /* Make 2-col form grids collapse gracefully on smaller effective widths */
 @media(max-width:1100px){
@@ -825,4 +915,253 @@ button:hover svg.spin-on-hover{transform:rotate(180deg);transition:transform 0.4
 @media (max-width:480px){
   .att-pdf-preview{max-width:100%}
   .att-thumb{width:110px;height:110px}
+}
+
+/* ============================================================
+   DARK MODE — broad catches for the most common inline colors
+   used throughout the app's JS-generated content. This can't be a
+   perfect 1:1 rewrite of every hardcoded color (there are thousands
+   of them across every module), but this covers the overwhelming
+   majority: neutral card/surface backgrounds and body/muted text.
+   Colorful semantic tints (status badges, warning banners, etc.)
+   are deliberately left alone — they still read fine as-is.
+============================================================ */
+[data-theme="dark"] [style*="background:#fff"],
+[data-theme="dark"] [style*="background: #fff"],
+[data-theme="dark"] [style*="background:#f7f7f7"],
+[data-theme="dark"] [style*="background:#f5f6fa"],
+[data-theme="dark"] [style*="background:#f0f0f0"],
+[data-theme="dark"] [style*="background:#f3f3f7"],
+[data-theme="dark"] [style*="background:#fafafa"],
+[data-theme="dark"] [style*="background:#fafbfc"],
+[data-theme="dark"] [style*="background:#f7f8fc"],
+[data-theme="dark"] [style*="background:#eee"],
+[data-theme="dark"] [style*="background:#f4f8ff"],
+[data-theme="dark"] [style*="background:#f0f2f5"],
+[data-theme="dark"] [style*="background:#eef0f3"],
+[data-theme="dark"] [style*="background: #f7f7f7"]{
+  background: var(--surface-2) !important;
+}
+[data-theme="dark"] [style*="background:#eef0ff"],
+[data-theme="dark"] [style*="background:#f3f0ff"],
+[data-theme="dark"] [style*="background:#f3f1ff"],
+[data-theme="dark"] [style*="background:#ede8fe"]{
+  background: #262a45 !important;
+}
+[data-theme="dark"] [style*="color:#888"],
+[data-theme="dark"] [style*="color:#999"],
+[data-theme="dark"] [style*="color:#aaa"],
+[data-theme="dark"] [style*="color:#bbb"],
+[data-theme="dark"] [style*="color:#555"],
+[data-theme="dark"] [style*="color:#666"]{
+  color: var(--text-muted) !important;
+}
+[data-theme="dark"] [style*="color:#333"],
+[data-theme="dark"] [style*="color:#222"],
+[data-theme="dark"] [style*="color:#1a2740"],
+[data-theme="dark"] [style*="color:#1a5276"],
+[data-theme="dark"] [style*="color:#0d2137"],
+[data-theme="dark"] [style*="color:#1a3a5c"],
+[data-theme="dark"] [style*="color:#1a1a1a"],
+[data-theme="dark"] [style*="color:#32325d"]{
+  color: var(--text) !important;
+}
+/* Stat tiles hardcode a light gradient background regardless of theme —
+   fixed here since it's one shared component (renderStatTiles). */
+[data-theme="dark"] .stat-tile{
+  background: linear-gradient(160deg, var(--surface), var(--surface-2)) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="dark"] .stat-tile-l{ color: var(--text-faint) !important; }
+[data-theme="dark"] table thead tr,
+[data-theme="dark"] thead tr{ background: var(--surface-2) !important; }
+[data-theme="dark"] [style*="border:1px solid #eef0f3"],
+[data-theme="dark"] [style*="border-bottom:1px solid #eef0f3"],
+[data-theme="dark"] [style*="border:1px solid #e5e5e5"],
+[data-theme="dark"] [style*="border-bottom:1px solid #f0f0f3"],
+[data-theme="dark"] [style*="border-bottom:1px solid #f2f2f2"]{
+  border-color: var(--border) !important;
+}
+
+/* ── Status badge PAIRS (background + text together) ──────────
+   These MUST be overridden as matched pairs, not independently —
+   overriding just one half of a badge's background/text combo left
+   the other half untouched, producing light-text-on-light-background
+   (or the reverse) that was unreadable in dark mode. Every status
+   color map in the app (coordinator/account/proposals status
+   dropdowns, document status, etc.) draws from this same small set of
+   5 semantic pairs, so this covers all of them at once. Compound
+   attribute selectors ([style*="a"][style*="b"]) only match elements
+   that have BOTH substrings, so plain text using just one of these
+   colors elsewhere is unaffected. */
+[data-theme="dark"] [style*="background:#eef0f3"][style*="color:#777"],
+[data-theme="dark"] [style*="background:#f0f0f0"][style*="color:#888"]{
+  background:#2a2f3a !important; color:#9aa0ab !important; border-color:#3a4250 !important;
+}
+[data-theme="dark"] [style*="background:#eef4ff"][style*="color:#1a3a5c"],
+[data-theme="dark"] [style*="background:#e8f0fe"][style*="color:#1a5276"]{
+  background:#182a42 !important; color:#6aa0d4 !important; border-color:#2a4a70 !important;
+}
+[data-theme="dark"] [style*="background:#fdf3df"][style*="color:#a06b00"],
+[data-theme="dark"] [style*="background:#ffe8cc"][style*="color:#a04800"]{
+  background:#3d2f10 !important; color:#d1a050 !important; border-color:#5c4818 !important;
+}
+[data-theme="dark"] [style*="background:#e3f6ee"][style*="color:#166a3f"],
+[data-theme="dark"] [style*="background:#d4f0e3"][style*="color:#166a3f"]{
+  background:#0f2e20 !important; color:#4fb37f !important; border-color:#1c4a34 !important;
+}
+[data-theme="dark"] [style*="background:#fde8e8"][style*="color:#a32d2d"],
+[data-theme="dark"] [style*="background:#fdecec"][style*="color:#a32d2d"],
+[data-theme="dark"] [style*="background:#fdecec"][style*="color:#a33"]{
+  background:#3d1515 !important; color:#e07070 !important; border-color:#5c2323 !important;
+}
+[data-theme="dark"] [style*="color:#a33"]{ color:#e07070 !important; }
+
+/* Warm/orange notice banners — several near-duplicate light tints across
+   coordinator/proposals/auth all pairing with the same #a06b00 text */
+[data-theme="dark"] [style*="background:#fff7e6"][style*="color:#a06b00"],
+[data-theme="dark"] [style*="background:#fff4e5"][style*="color:#a06b00"],
+[data-theme="dark"] [style*="background:#fde8d8"][style*="color:#a04800"]{
+  background:#3d2f10 !important; color:#d1a050 !important; border-color:#5c4818 !important;
+}
+[data-theme="dark"] [style*="background:#fff3e0"][style*="color:#e67e22"]{
+  background:#3d2510 !important; color:#d8834a !important; border-color:#5c3a18 !important;
+}
+
+/* Blue info tints */
+[data-theme="dark"] [style*="background:#e8f4ff"][style*="color:#1a5276"]{
+  background:#182a42 !important; color:#6aa0d4 !important; border-color:#2a4a70 !important;
+}
+
+/* Purple tints — role badge pairs not covered by the plain surface wash above */
+[data-theme="dark"] [style*="background:#eef0fb"][style*="color:#3c3489"],
+[data-theme="dark"] [style*="background:#eeedfe"][style*="color:#3c3489"]{
+  background:#262a45 !important; color:#a898dd !important; border-color:#3d3a5c !important;
+}
+[data-theme="dark"] [style*="background:#f3ecfb"][style*="color:#5b2c86"]{
+  background:#2a2040 !important; color:#b898d9 !important; border-color:#453560 !important;
+}
+
+/* Role-badge pairs (auth.js ROLE_BADGE map) not covered by the groups above */
+[data-theme="dark"] [style*="background:#faece7"][style*="color:#712b13"]{
+  background:#3d1f18 !important; color:#e09070 !important; border-color:#5c3226 !important;
+}
+[data-theme="dark"] [style*="background:#e7f1fd"][style*="color:#1a4e8a"]{
+  background:#182a42 !important; color:#6aa0d4 !important; border-color:#2a4a70 !important;
+}
+[data-theme="dark"] [style*="background:#faeeda"][style*="color:#633806"]{
+  background:#3d2f10 !important; color:#d1a050 !important; border-color:#5c4818 !important;
+}
+[data-theme="dark"] [style*="background:#e0f0ea"][style*="color:#1c6b4a"]{
+  background:#0f2e20 !important; color:#4fb37f !important; border-color:#1c4a34 !important;
+}
+[data-theme="dark"] .cat-card,
+[data-theme="dark"] .proj-row,
+[data-theme="dark"] .dash-card{
+  background: var(--surface) !important; border-color: var(--border) !important;
+}
+
+/* ============================================================
+   DARK MODE — class-based component overrides.
+   Everything above only fixes elements carrying an inline
+   style="" attribute (JS-rendered dynamic content). These
+   components hardcode their light colors directly as CSS class
+   rules earlier in this file instead, so the [style*="..."]
+   catches never touch them — they stayed white/light with dark
+   text no matter what theme was selected. This block is what
+   was missing: the top tab bar, table/list rows, filter bars,
+   and form fields across every module.
+============================================================ */
+[data-theme="dark"] .topbar,
+[data-theme="dark"] .tabs,
+[data-theme="dark"] .coord-name-box,
+[data-theme="dark"] .coord-search-bar,
+[data-theme="dark"] .rte-wrap,
+[data-theme="dark"] .reapp-entry,
+[data-theme="dark"] .reapp-client-box,
+[data-theme="dark"] .admin-nav-tabs,
+[data-theme="dark"] .pipeline-pill,
+[data-theme="dark"] .search-bar,
+[data-theme="dark"] .proj-type-option,
+[data-theme="dark"] .admin-popup,
+[data-theme="dark"] .auth-tabs,
+[data-theme="dark"] .range-bar,
+[data-theme="dark"] .milestone-label,
+[data-theme="dark"] .linkbox-url,
+[data-theme="dark"] .login-link-btn,
+[data-theme="dark"] .se-reorder-btn{
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .dch,
+[data-theme="dark"] .se,
+[data-theme="dark"] .deg,
+[data-theme="dark"] .rte-toolbar,
+[data-theme="dark"] .prop-filters,
+[data-theme="dark"] .lpo-kpi,
+[data-theme="dark"] .pipeline-proj-row{
+  background: var(--surface-2) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="dark"] .bar-row:hover,
+[data-theme="dark"] .coord-row:hover,
+[data-theme="dark"] .attn-row:hover{
+  background: var(--surface-2) !important;
+}
+[data-theme="dark"] .landing-body{ background: var(--bg) !important; }
+
+[data-theme="dark"] .dr,
+[data-theme="dark"] .tab.on,
+[data-theme="dark"] .sname,
+[data-theme="dark"] .milestone-value,
+[data-theme="dark"] .modal h3,
+[data-theme="dark"] .prop-act-body,
+[data-theme="dark"] .rte-btn,
+[data-theme="dark"] .rte-editor,
+[data-theme="dark"] .act-stage,
+[data-theme="dark"] .admin-nav-tab.on,
+[data-theme="dark"] .kpi-num,
+[data-theme="dark"] .bar-count,
+[data-theme="dark"] .coord-row,
+[data-theme="dark"] .coord-name,
+[data-theme="dark"] .attn-stage,
+[data-theme="dark"] .auth-tab.on,
+[data-theme="dark"] .auth-kpi-n,
+[data-theme="dark"] .lpo-kpi-n,
+[data-theme="dark"] .pay-lpo-name,
+[data-theme="dark"] .pay-lpo-amt,
+[data-theme="dark"] .range-input,
+[data-theme="dark"] .proj-row-title,
+[data-theme="dark"] .proj-pct,
+[data-theme="dark"] .proj-type-label,
+[data-theme="dark"] .die-n,
+[data-theme="dark"] .die-sel,
+[data-theme="dark"] .deg-name{
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .se-ni,
+[data-theme="dark"] .se-sel,
+[data-theme="dark"] .scope-details-fi,
+[data-theme="dark"] .se-note,
+[data-theme="dark"] .se-date-fi,
+[data-theme="dark"] .search-input,
+[data-theme="dark"] .coord-search-input,
+[data-theme="dark"] .filter-sel,
+[data-theme="dark"] .prop-filter-input,
+[data-theme="dark"] .coord-filter-sel,
+[data-theme="dark"] .rte-select{
+  background: var(--input-bg) !important;
+  border-color: var(--input-border) !important;
+  color: var(--input-text) !important;
+}
+[data-theme="dark"] .se-appnum-fi{
+  background: #3d1515 !important;
+  color: var(--input-text) !important;
+}
+[data-theme="dark"] .range-now{
+  background: #2a2340 !important;
+  color: var(--text) !important;
 }

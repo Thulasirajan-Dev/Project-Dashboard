@@ -1,0 +1,9 @@
+# ============================================================
+#  Block ALL direct access to database backup files.
+#  These .sql dumps contain PIN hashes, client data, and everything
+#  else in the database — nobody should be able to just browse to
+#  api/backups/whc-backup-....sql and download it directly. The
+#  ONLY way to get a backup is through api/backup.php, which
+#  requires a Super Admin session or the secret backup token.
+# ============================================================
+Require all denied

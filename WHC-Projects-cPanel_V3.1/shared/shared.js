@@ -9,12 +9,12 @@
 //  unchanged — only the backend moved from Firebase to MySQL.
 //  Each call POSTs { op, path, data } to the PHP data API, which
 //  translates the path into SQL and returns Firebase-shaped JSON.
-const DATA_API = "/api/data.php";
+var DATA_API = "/api/data.php";
 
 // In-memory read cache (unchanged behaviour): cuts redundant reads
 // of large collections when navigating between tabs within a session.
-const _fbCache = new Map();          // path -> { t: timestamp, v: value }
-const _FB_TTL = 15000;               // 15s; tune as needed
+var _fbCache = new Map();          // path -> { t: timestamp, v: value }
+var _FB_TTL = 15000;               // 15s; tune as needed
 
 function _fbInvalidate(path) {
   // Invalidate the path and any parent collection (e.g. writing
@@ -32,6 +32,19 @@ async function _dataCall(op, path, data) {
     credentials: "include",
     body: JSON.stringify({ op, path, data }),
   });
+  if (res.status === 401) {
+    // Either not authenticated, or (see api/db/conn.php session_still_current)
+    // this account signed in elsewhere and this session was invalidated.
+    // Silently failing here would leave the user stuck clicking a dead UI —
+    // send them back to login with a clear reason instead.
+    let msg = "";
+    try { msg = (await res.json()).error || ""; } catch (e) {}
+    clearSession();
+    if (typeof window !== "undefined" && !/\/auth\/?$/.test(window.location.pathname)) {
+      window.location.href = "/auth/?session_replaced=" + (msg.toLowerCase().includes("another device") ? "1" : "0");
+    }
+    throw new Error(msg || "Not authenticated");
+  }
   if (!res.ok) {
     let detail = "";
     try { detail = (await res.json()).error || ""; } catch (e) {}
@@ -65,6 +78,17 @@ async function fbDelete(path) {
     _fbInvalidate(path);
     return true;
   } catch (e) { return false; }
+}
+// Atomically increment a counter and return the value it had BEFORE
+// incrementing (the number to use). Never races: see the 'increment' op
+// in api/data.php (row-locked transaction), used for quotation numbering
+// so two simultaneous "New Quotation" clicks can never get the same seq.
+async function fbIncrement(path, startSeq) {
+  try {
+    const res = await _dataCall("increment", path, { startSeq: startSeq || 1 });
+    _fbInvalidate(path);
+    return (res && typeof res.seq === "number") ? res.seq : null;
+  } catch (e) { return null; }
 }
 
 // ── Persistent (localStorage) cache for big collections ─────────
@@ -109,8 +133,8 @@ function currentActor() {
 
 // ── Global dropdown option lists ──────────────────────────────
 // Editable dropdowns (datalists) whose custom entries persist globally.
-let WHC_OPTIONS = {};
-const _OPTION_DEFAULTS = {
+var WHC_OPTIONS = {};
+var _OPTION_DEFAULTS = {
   subcontractor_type: ["ADM", "ADDC", "Local / ADDC", "Freelancer"],
   govt_fee_type: ["Government Dept", "Aldar Tasareeh", "ADM Fees", "ADDC Fees", "Other Govt Fee"]
 };
@@ -156,7 +180,7 @@ function editableSelect(type, currentVal, onInputExpr, styleStr) {
 // Ownership/attribution is stored by EMAIL everywhere. Names are for display
 // only. Any page loads the directory once (loadUserDirectory) and uses
 // resolveUserName() to turn a stored email back into a friendly name.
-let WHC_USERS = [];
+var WHC_USERS = [];
 async function loadUserDirectory() {
   try {
     const res = await fetch("/api/auth.php", {
@@ -176,9 +200,21 @@ function resolveUserName(val) {
   return u ? u.name : val;   // fall back to the raw value if unknown
 }
 // The email to store for the logged-in actor (falls back to name if no email).
-function actorId() {
-  const u = getSession() || {};
-  return u.email || u.name || "";
+
+// ── Pictorial, clickable stat tile row ──────────────────────────
+// Single shared renderer so Coordinator/Account/Proposals all look and
+// behave consistently. tiles: [{ n, l, icon, c, f, title, onclick }]
+// n=count, l=label, icon=emoji, c=accent color, onclick=JS string,
+// active=bool (highlights the currently-selected tile).
+function renderStatTiles(tiles, opts) {
+  const minPx = (opts && opts.minPx) || 100;
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(${minPx}px,1fr));gap:10px">
+    ${tiles.map(t => `<div class="stat-tile${t.active?' stat-tile-on':''}" style="--tile-color:${t.c}" title="${esc(t.title||'')}" onclick="${t.onclick}">
+      <div class="stat-tile-icon">${t.icon||'📌'}</div>
+      <div class="stat-tile-n">${t.n}</div>
+      <div class="stat-tile-l">${esc(t.l)}</div>
+    </div>`).join("")}
+  </div>`;
 }
 
 function stampAudit(record, isEdit) {
@@ -200,6 +236,36 @@ function stampAudit(record, isEdit) {
   hist.push({ action: isEdit ? "edited" : "created", by: who.name, role: who.role, at: now });
   record.editHistory = hist;
   return record;
+}
+
+// Save a project by writing ONLY the top-level keys that actually changed
+// since it was loaded (comparing against the snapshot taken at open time),
+// via targeted sub-path writes — NEVER a full-object overwrite. This means
+// a field nobody touched in THIS session can never be clobbered by this
+// save, even if another user (Coordinator/Account/Proposals/Team Lead)
+// changed it in the meantime — e.g. Account crediting a milestone while
+// Coordinator has the same project open editing approval stages. The
+// server already merges sub-path writes against the current DB row (see
+// handleProjects in data.php), so each changed key lands correctly.
+// Residual risk: if the SAME key is edited by two people in the same
+// window, last-write-wins for that one key — unavoidable without locking,
+// and a much smaller conflict surface than a full-object overwrite.
+async function saveProjectDiff(projectId, snapshot, current) {
+  if (!projectId || !current) return false;
+  const keys = new Set([...Object.keys(snapshot || {}), ...Object.keys(current)]);
+  const changedKeys = [];
+  keys.forEach(k => {
+    const a = JSON.stringify((snapshot && snapshot[k]) != null ? snapshot[k] : null);
+    const b = JSON.stringify(current[k] != null ? current[k] : null);
+    if (a !== b) changedKeys.push(k);
+  });
+  if (!changedKeys.length) return true; // nothing changed — nothing to save
+  let allOk = true;
+  for (const k of changedKeys) {
+    const ok = await fbSet(coPath("projects/" + projectId + "/" + k), current[k]);
+    if (!ok) allOk = false;
+  }
+  return allOk;
 }
 
 // Append one entry to the global activity log. Best-effort; never blocks the save.
@@ -244,8 +310,10 @@ async function logActivity(module, action, target, detail, changes, projectId) {
       projectId: projectId || ""
     };
     if (Array.isArray(changes) && changes.length) entry.changes = changes.slice(0, 60);
-    const key = "log_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
-    await fbSet(`activity_log/${key}`, entry);
+    // No client-generated key — the server auto-increments a real row id
+    // (see handleLog in data.php), this is a plain insert into a proper
+    // indexed table, not a JSON blob keyed by a random string.
+    await fbSet(coPath("activity_log"), entry);
   } catch (e) { /* logging must never break the main action */ }
 }
 
@@ -262,19 +330,198 @@ async function logProjectChanges(module, prev, next, targetName) {
   } catch (e) {}
 }
 
-// Fetch recent activity entries (newest first), optionally filtered by module.
-async function getActivityLog(moduleFilter, limit, projectId) {
-  // The data API returns activity_log time-ordered (oldest→newest).
-  // We fetch and take the most recent `limit` rows client-side. For very
-  // large logs you can add a server-side limit param later; the periodic
-  // prune (see admin tools) keeps this collection small in practice.
-  const n = limit || 300;
-  const all = await fbGet("activity_log", { fresh: true });
-  let rows = Object.values(all || {});
-  if (projectId) rows = rows.filter(r => r.projectId === projectId);
-  if (moduleFilter && moduleFilter !== "all") rows = rows.filter(r => r.module === moduleFilter);
-  rows.sort((a, b) => (b.at || "").localeCompare(a.at || ""));
-  return rows.slice(0, n);
+// Fetch activity entries — real server-side filtering now (module, project,
+// actor, date range, free-text search all happen in SQL via handleLog's
+// 'get' branch), not a pull-everything-then-filter-in-JS approach. Never
+// cached — a log view should always be current.
+// ============================================================
+//  Dependent Tasks — ServiceNow-style request/ticket model.
+//  Raised by Proposals or Coordinator against a specific project.
+//  Every task has an auto-generated ticket number (DT-00001, …), an
+//  Assignment Group (always one of the departments — the team it's
+//  routed to) and an optional Assigned To (a specific person within
+//  that group actively working it, can be set later). Work notes are a
+//  running comment thread, same idea as a ServiceNow ticket's activity
+//  feed. Stored in the dependent_tasks table (see api/db/schema.sql) —
+//  hybrid pattern: stable columns for filtering (project/status/
+//  priority/assignee) + a JSON blob for the full record, including
+//  assignmentGroup/assignedTo/workNotes which don't need their own
+//  indexed columns.
+// ============================================================
+var DEP_TASK_DEPARTMENTS = ["Architecture", "MEP", "FLS", "Structural", "Document Controller", "Project Manager", "Resident Engineer"];
+// ServiceNow-style state workflow.
+var DEP_TASK_STATUSES = ["New", "Assigned", "In Progress", "On Hold", "Resolved", "Closed"];
+var DEP_TASK_PRIORITIES = ["Low", "Medium", "High", "Urgent"];
+var DEP_TASK_STATUS_STYLE = {
+  "New":         { bg: "#eef0f3", color: "#777",   icon: "" },
+  "Assigned":    { bg: "#eef0ff", color: "#5b3df5", icon: "👤" },
+  "In Progress": { bg: "#e8f0fe", color: "#1a5276", icon: "●" },
+  "On Hold":     { bg: "#ffe8cc", color: "#a04800", icon: "⏸" },
+  "Resolved":    { bg: "#d4f0e3", color: "#166a3f", icon: "✓" },
+  "Closed":      { bg: "#e5e5e5", color: "#666",    icon: "🔒" },
+};
+var DEP_TASK_PRIORITY_STYLE = {
+  "Low":    { bg: "#eef0f3", color: "#777" },
+  "Medium": { bg: "#e8f0fe", color: "#1a5276" },
+  "High":   { bg: "#ffe8cc", color: "#a04800" },
+  "Urgent": { bg: "#fde8e8", color: "#a32d2d" },
+};
+
+// Raise a new dependent task (ticket) against a project. fields: { title,
+// description, priority, assignmentGroup (required — a department),
+// assignedTo (optional — a specific person's email/name), dueDate,
+// raisedModule:'Proposals'|'Coordinator' }. Returns the new task's id, or
+// null on failure.
+async function createDependentTask(projectId, fields) {
+  if (!projectId || !fields || !(fields.title || "").trim() || !fields.assignmentGroup) return null;
+  const who = currentActor();
+  const nowIso = new Date().toISOString();
+  // DT-00001, DT-00002, … — same atomic-counter mechanism already used for
+  // quotation numbers, just a different counter key.
+  const seq = await fbIncrement("dep_task_counter", 1);
+  const taskNumber = "DT-" + String(seq || Date.now()).padStart(5, "0");
+  const id = "task_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+  const initialStatus = fields.assignedTo ? "Assigned" : "New";
+  const rec = {
+    taskNumber,
+    projectId,
+    title: (fields.title || "").trim(),
+    description: (fields.description || "").trim(),
+    status: initialStatus,
+    priority: fields.priority || "Medium",
+    // Kept for backward-compat filtering via the flat DB columns
+    // (assignee_type/assignee) — assignmentGroup IS the "assignee" from
+    // the table's point of view; assignedTo lives only in the JSON blob.
+    assigneeType: "department",
+    assignee: fields.assignmentGroup,
+    assignmentGroup: fields.assignmentGroup,
+    assignedTo: fields.assignedTo || "",
+    dueDate: fields.dueDate || "",
+    progressPct: 0,
+    raisedBy: who.email || who.name || "",
+    raisedByName: who.name || "",
+    raisedByRole: who.role || "",
+    raisedModule: fields.raisedModule || "",
+    createdAt: nowIso,
+    workNotes: [],
+    statusHistory: [{ status: initialStatus, at: nowIso, by: who.name || who.email || "" }],
+  };
+  const ok = await fbSet("dependent_tasks/" + id, rec);
+  if (ok && typeof logActivity === "function") {
+    const detail = `Group: ${rec.assignmentGroup}` + (rec.assignedTo ? ` · Assigned: ${rec.assignedTo}` : "");
+    logActivity(rec.raisedModule || "Proposals", "Raised dependent task", `${taskNumber} — ${rec.title}`, detail, null, projectId);
+  }
+  return ok ? id : null;
+}
+
+// Fetch every dependent task for a project (always a fresh server read —
+// this data changes across roles/modules too often to trust the client
+// cache). Returns [] on failure or if there are none.
+async function getDependentTasksForProject(projectId) {
+  if (!projectId) return [];
+  try {
+    const rows = await _dataCall("get", "dependent_tasks", { projectId });
+    return Array.isArray(rows) ? rows : [];
+  } catch (e) { return []; }
+}
+
+// Update a task's status (and optionally progress %), appending to its
+// history so there's a visible trail of who changed what and when.
+async function updateDependentTaskStatus(taskId, newStatus, progressPct) {
+  if (!taskId) return false;
+  try {
+    const existing = await _dataCall("get", "dependent_tasks/" + taskId, null);
+    if (!existing) return false;
+    const who = currentActor();
+    const nowIso = new Date().toISOString();
+    existing.status = newStatus;
+    if (progressPct != null) existing.progressPct = Math.max(0, Math.min(100, Number(progressPct) || 0));
+    if (newStatus === "Resolved" || newStatus === "Closed") { existing.progressPct = 100; existing.completedAt = nowIso; }
+    if (!Array.isArray(existing.statusHistory)) existing.statusHistory = [];
+    existing.statusHistory.push({ status: newStatus, at: nowIso, by: who.name || who.email || "" });
+    const ok = await fbSet("dependent_tasks/" + taskId, existing);
+    if (ok && typeof logActivity === "function") {
+      logActivity("Dependent Tasks", "Updated task status", `${existing.taskNumber || taskId} — ${existing.title || ""}`,
+        `${newStatus}${progressPct != null ? " · " + existing.progressPct + "%" : ""}`, null, existing.projectId);
+    }
+    return ok;
+  } catch (e) { return false; }
+}
+
+// Set/change who within the assignment group is actively working the
+// ticket. Auto-transitions New → Assigned, same as ServiceNow's default
+// assignment behavior — doesn't touch status if it's already further along.
+async function assignDependentTaskTo(taskId, assignedTo) {
+  if (!taskId) return false;
+  try {
+    const existing = await _dataCall("get", "dependent_tasks/" + taskId, null);
+    if (!existing) return false;
+    const who = currentActor();
+    const nowIso = new Date().toISOString();
+    existing.assignedTo = assignedTo || "";
+    if (assignedTo && existing.status === "New") {
+      existing.status = "Assigned";
+      if (!Array.isArray(existing.statusHistory)) existing.statusHistory = [];
+      existing.statusHistory.push({ status: "Assigned", at: nowIso, by: who.name || who.email || "" });
+    }
+    const ok = await fbSet("dependent_tasks/" + taskId, existing);
+    if (ok && typeof logActivity === "function") {
+      logActivity("Dependent Tasks", "Reassigned task", `${existing.taskNumber || taskId} — ${existing.title || ""}`,
+        assignedTo ? `Assigned to ${assignedTo}` : "Unassigned", null, existing.projectId);
+    }
+    return ok;
+  } catch (e) { return false; }
+}
+
+// Append a work note (free-text comment) to a task's activity thread —
+// same idea as a ServiceNow ticket's work-notes feed. Doesn't change
+// status or any other field, purely a running log entry.
+async function addDependentTaskNote(taskId, note) {
+  if (!taskId || !(note || "").trim()) return false;
+  try {
+    const existing = await _dataCall("get", "dependent_tasks/" + taskId, null);
+    if (!existing) return false;
+    const who = currentActor();
+    if (!Array.isArray(existing.workNotes)) existing.workNotes = [];
+    existing.workNotes.push({ note: note.trim(), at: new Date().toISOString(), by: who.name || who.email || "", byRole: who.role || "" });
+    const ok = await fbSet("dependent_tasks/" + taskId, existing);
+    if (ok && typeof logActivity === "function") {
+      logActivity("Dependent Tasks", "Added work note", `${existing.taskNumber || taskId} — ${existing.title || ""}`,
+        note.trim().slice(0, 140), null, existing.projectId);
+    }
+    return ok;
+  } catch (e) { return false; }
+}
+
+async function deleteDependentTask(taskId, projectId) {
+  if (!taskId) return false;
+  try {
+    const ok = await _dataCall("delete", "dependent_tasks/" + taskId, null);
+    if (ok && typeof logActivity === "function") logActivity("Dependent Tasks", "Deleted task", taskId, "", null, projectId || "");
+    return !!ok;
+  } catch (e) { return false; }
+}
+
+async function getActivityLog(moduleFilter, limit, projectId, extraFilters) {
+  const filters = Object.assign({
+    module: (moduleFilter && moduleFilter !== "all") ? moduleFilter : undefined,
+    projectId: projectId || undefined,
+    limit: limit || 300,
+  }, extraFilters || {});
+  // Distinguish "genuinely zero events" from "the fetch failed" — these
+  // used to look identical (both returned []), which made a real problem
+  // (network error, permission error, missing table) invisible, always
+  // showing as the same "No events match this filter" message.
+  // NOTE: deliberately NOT wrapped in coPath() — logActivity() never uses
+  // it either when writing, so every event is written under the default
+  // company regardless of which company was active at the time. Reading
+  // through coPath() here would silently show zero events for anyone
+  // viewing the log while on a non-default company (Moonway / WH Safety &
+  // Fire), since it would look for rows that were never actually written
+  // under that company. Activity Log is a Super-Admin-only audit view, so
+  // showing everything globally is also the more correct behavior anyway.
+  const rows = await _dataCall("get", "activity_log", filters);
+  return Array.isArray(rows) ? rows : [];
 }
 
 
@@ -283,9 +530,9 @@ async function getActivityLog(moduleFilter, limit, projectId) {
 //  120-minute IDLE timeout: the clock resets on user activity.
 //  A warning appears ~2 minutes before auto-logout. All client-side
 //  (no server calls, no bandwidth cost).
-const SESSION_IDLE_MS   = 120 * 60 * 1000;   // 120 minutes
-const SESSION_WARN_MS   = 2   * 60 * 1000;   // warn 2 min before logout
-const SESSION_TS_KEY    = "whc_last_activity";
+var SESSION_IDLE_MS   = 120 * 60 * 1000;   // 120 minutes
+var SESSION_WARN_MS   = 2   * 60 * 1000;   // warn 2 min before logout
+var SESSION_TS_KEY    = "whc_last_activity";
 
 function _now() { return Date.now(); }
 function _touchActivity() {
@@ -327,7 +574,7 @@ function clearSession() {
 // ── Idle watchdog: wire up once per page on DOMContentLoaded ───
 //  - Listens for real user activity to reset the idle clock.
 //  - Polls every 15s; shows a warning bar at T-2min; logs out at T-0.
-let _sessionWarnShown = false;
+var _sessionWarnShown = false;
 function _showTimeoutWarning(secondsLeft) {
   let bar = document.getElementById("whc-timeout-bar");
   if (!bar) {
@@ -395,7 +642,7 @@ if (typeof window !== "undefined") {
 //  WHC keeps the original (un-prefixed) data paths so existing
 //  data is untouched. The two new companies use their own prefix.
 // ============================================================
-const COMPANIES = [
+var COMPANIES = [
   { id:"whc",  name:"Winner Holistic Consultant",   short:"WHC",  prefix:"",       accent:"#6d28d9" },
   { id:"mw",   name:"Moonway General Contracting",  short:"Moonway", prefix:"mw/",  accent:"#2563eb" },
   { id:"whsf", name:"WH Safety and Fire",           short:"WH S&F", prefix:"whsf/", accent:"#dc2626" },
@@ -425,14 +672,14 @@ async function hashPin(pin) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(pin)));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
-async function loginWithPin(nameOrEmail, pin) {
+async function loginWithPin(email, pin) {
   // Server verifies the PIN against MySQL and starts a session cookie.
   // The browser never downloads other users' hashes.
   try {
     const res = await fetch("/api/auth.php", {
       method: "POST", headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ action: "login", name: nameOrEmail, pin })
+      body: JSON.stringify({ action: "login", email, pin })
     });
     const data = await res.json();
     if (res.ok && data.ok && data.user) { setSession(data.user); return data.user; }
@@ -515,7 +762,18 @@ function requireRole(...roles) {
   }
   return user;
 }
-function makeUserId() { return "u" + Date.now() + "_" + Math.random().toString(36).substr(2, 5); }
+// Preferred over requireRole(...) for whole-module guards — reads the
+// allowed-roles list from the central MODULE_ACCESS config (shared/
+// permissions.js) instead of repeating the role list in every page.
+function requireModule(moduleKey) {
+  const user = getSession();
+  if (!user || !canAccessModule(moduleKey, user.role)) {
+    clearSession();
+    window.location.href = "/auth/";
+    return null;
+  }
+  return user;
+}
 
 // ── String / date helpers ─────────────────────────────────────
 function esc(v) {
@@ -532,7 +790,6 @@ function fmtDateTime(iso) {
   try { const d = new Date(iso); return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) + " " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }); } catch (e) { return iso; }
 }
 function fmtMoney(n) { return Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 }); }
-function makeId() { return "p" + Date.now() + "_" + Math.random().toString(36).substr(2, 6); }
 function copyText(txt) { navigator.clipboard.writeText(txt).then(() => alert("Link copied!\n\n" + txt)).catch(() => prompt("Copy this link:", txt)); }
 // Build the public, read-only client link. Uses the project's random
 // clientToken (not the guessable project id) and points at the client page.
@@ -553,10 +810,87 @@ function natureDisplay(u) { const a = natureArr(u); return a.length ? a.join(", 
 function natureCSV(u) { return natureArr(u).join("; "); }
 
 // ── Constants ─────────────────────────────────────────────────
-const PROJECT_TYPES_NEW = ["Retail", "Office", "Industrial", "Residential", "Educational", "Entertainment", "Agricultural", "Other"];
-const FOLDER_CATEGORIES = ["Fitout Folder", "Live Folder", "ID Folder", "Private Folder"];
+var PROJECT_TYPES_NEW = ["Retail", "Office", "Industry", "Residentials", "Education", "Entertainment", "Agriculture", "Medical", "Others"];
 
-const STATUS_DISPLAY = {
+// ── Predefined templates (single source of truth) ──────────────
+// Scope of Works: Master-Template is the ONLY source of truth for scope
+// items across the whole app. It holds section headings + descriptions
+// only — no AED values, since pricing is quotation-specific, not
+// template-specific. Edited via the Templates module (Create/Edit); an
+// edited copy is saved under the SAME name in the custom template store
+// (see CUSTOM_SCOPE_TEMPLATES below), which then takes precedence over
+// this hardcoded default. Proposals loads scope from it automatically when
+// starting a new quotation; editing within a quotation never writes back.
+var MASTER_SCOPE_TEMPLATE_NAME = "Master-Template";
+var SCOPE_TEMPLATES = {
+  "Master-Template": [
+    { code: "B.1", name: "ADM Submission Package & Fire/Life Safety Strategy", desc: "Preparation of ADM Submission Package including Key Plan, Partition Layout & Section based on Final Architectural Drawings (CAD Files). Preparation of Fire and Life Safety Strategy Layout. Submission to ADM/ADCD and obtain approval." },
+    { code: "B.2", name: "Fire Protection System Shop Drawings approval from ADCD", desc: "Receipt of Fire Protection (Fire Fighting, Fire Alarm, Emergency, Exit & Fire Suppression System) shop drawings from the Fire Contractor. Completeness check, submission to ADCD, follow-up and obtain approval." },
+    { code: "B.3", name: "Kitchen Ventilation System Design Drawings for ADCD Approval", desc: "Collection of complete set of Kitchen Ventilation System Drawings & Design Calculation Notes from the Specialist Contractor. Compilation and submission to ADCD for approval." },
+    { code: "B.4", name: "Completion Certificate from ADCD", desc: "Coordination with Main Contractor & Fire Contractor, collect and compile documents, apply for site inspection and obtain the completion certificate." },
+    { code: "B.5", name: "Completion Certificate from ADM", desc: "Coordination with Main Contractor & Fire Contractor, collect and compile documents, apply for site inspection and obtain the completion certificate." },
+    { code: "B.6", name: "Scope of the Local Civil Contractor", desc: "Pull out the Modification Building Permit from ADM after completion of approval (item B.1). Provide letters, certificates & shop drawing approvals/completion certificates from ADM/ADCD." }
+  ]
+};
+
+// Resolve the CURRENT Master-Template: an edited copy saved via the
+// Templates module (in the custom store, same name) takes precedence over
+// the hardcoded default above. Always call this rather than reading
+// SCOPE_TEMPLATES directly, so every page stays in sync with edits.
+function getMasterScopeTemplate(customScopeStore) {
+  const custom = customScopeStore && customScopeStore[MASTER_SCOPE_TEMPLATE_NAME];
+  if (custom) return (Array.isArray(custom) ? custom : (custom.items || [])).slice();
+  return (SCOPE_TEMPLATES[MASTER_SCOPE_TEMPLATE_NAME] || []).slice();
+}
+
+// Built-in Approval Stage templates live here too — for Coordinator's Approval
+// Stages tab. Stage names match STAGE_NAMES / account.js's filter list.
+// These MUST match blankStages() below exactly — same stage types (each
+// type has its own status option set, see STAGE_OPTIONS) and the same
+// "time" working-days estimates, since this is meant to be the loadable
+// version of what a new project already gets by default. They'd drifted
+// out of sync (this used to be just two generic types for every stage,
+// which meant loading it gave every stage the WRONG status dropdown).
+var APPROVAL_STAGE_TEMPLATES = {
+  "Standard ADM / TAQA / ADCD Flow": [
+    { name: "Project Scope Analysis and Requirement Collection", type: "scope", time: "" },
+    { name: "Project Registration", type: "registration", time: "5 working days" },
+    { name: "ADM and CD-FLS – Drawing Preparation", type: "drawing_prep", time: "" },
+    { name: "ADM & CD-FLS Approval", type: "approval_meps", time: "10 working days" },
+    { name: "TAQA Drawing Preparation", type: "drawing_prep", time: "" },
+    { name: "TAQA Drawing Approval", type: "approval_portal", time: "10 working days" },
+    { name: "ADCD Shop Drawing Preparation", type: "drawing_prep", time: "" },
+    { name: "ADCD Shop Drawing Approval", type: "approval_portal", time: "5 working days" },
+    { name: "Work Start Notice Approval", type: "approval_portal", time: "" },
+    { name: "Commencement of Site Work", type: "site_work", time: "" },
+    { name: "TAQA Inspection Approval", type: "inspection", time: "" },
+    { name: "Hassantuk & AMC Application Submission Initiation", type: "inspection", time: "" },
+    { name: "ADCD Inspection", type: "inspection", time: "5-6 working days" },
+    { name: "ADM Completion Inspection", type: "inspection", time: "7 working days" },
+    { name: "GIS Approval", type: "gis", time: "4-5 working days" },
+    { name: "Project Fully Completed", type: "completed", time: "" }
+  ],
+  "Fire & Life Safety Only": [
+    { name: "ADM and CD-FLS – Drawing Preparation", type: "drawing_prep", time: "" },
+    { name: "ADM & CD-FLS Approval", type: "approval_meps", time: "10 working days" },
+    { name: "ADCD Shop Drawing Preparation", type: "drawing_prep", time: "" },
+    { name: "ADCD Shop Drawing Approval", type: "approval_portal", time: "5 working days" },
+    { name: "ADCD Inspection", type: "inspection", time: "5-6 working days" },
+    { name: "ADM Completion Inspection", type: "inspection", time: "7 working days" }
+  ]
+};
+
+// Fetch the CUSTOM (team-saved) template store for either type. Used by
+// Proposals/Coordinator when picking a template, and by the Templates module
+// for the browsable overall list.
+async function loadCustomTemplates(kind) {
+  // kind: "scope_templates" | "approval_stage_templates"
+  try { return (await fbGet(coPath("options/" + kind))) || {}; }
+  catch (e) { return {}; }
+}
+var FOLDER_CATEGORIES = ["Fitout Folder", "Live Folder", "ID Folder", "Private Folder"];
+
+var STATUS_DISPLAY = {
   "": { label: "Pending", cls: "b-pending" },
   "requirement-pending": { label: "Requirement list yet to send", cls: "b-pending" },
   "awaiting-docs": { label: "Awaiting Documents", cls: "b-authority" },
@@ -585,7 +919,7 @@ const STATUS_DISPLAY = {
   "not-approved": { label: "Not Approved", cls: "b-not-approved" }
 };
 
-const STAGE_OPTIONS = {
+var STAGE_OPTIONS = {
   awarded_scope: [
     { v: "Not started", label: "Not started" },
     { v: "In progress", label: "In progress" },
@@ -638,13 +972,35 @@ const STAGE_OPTIONS = {
 // ── Stage logic helpers ───────────────────────────────────────
 function isStageComplete(st) { return ["received", "approved", "completed", "completed-signed", "approved-bcc"].includes(st.status || ""); }
 function projPct(p) { const vis = p.stages || []; return Math.round(vis.filter(s => isStageComplete(s)).length / Math.max(vis.length, 1) * 100); }
+// Always computed LIVE from actual stage progress — never trusts a stored
+// status value that could go stale. (Previously this checked
+// p.workflowStatus === "allocated" first and returned immediately, which
+// meant "active"/"done"/"new" below could never actually be reached, since
+// workflowStatus was set once at project creation and nothing ever advanced
+// it — every real project was permanently misreported as just "allocated."
+// See syncWorkflowStatus() for what keeps the STORED field in sync now.)
 function projStatus(p) {
-  if (p.workflowStatus === "proposal") return "proposal";
-  if (p.workflowStatus === "allocated") return "allocated";
-  const pc = projPct(p); if (pc === 100) return "done";
+  // Hold/Cancelled is a manual override — takes priority over the normal
+  // stage-progress classification below, regardless of how far along the
+  // stages/milestones actually are.
+  if (p && (p.holdStatus === "hold" || p.holdStatus === "cancelled")) return p.holdStatus;
+  if (p.workflowStatus === "proposal") return "proposal"; // rare/legacy pre-project state
+  const pc = projPct(p);
+  if (pc === 100 && (p.stages || []).length > 0) return "done";
   const act = ["under-review", "under-review-meps", "under-review-portal", "submitted", "submitted-meps", "under-preparation", "sent-client-review", "work-in-progress", "inspection-scheduled", "authority-progress"];
   if (pc > 0 || (p.stages || []).some(s => act.includes(s.status))) return "active";
   return "new";
+}
+// Keep the STORED workflowStatus field in sync with the live-computed
+// status, for the handful of places that check workflowStatus directly
+// (e.g. account.js's proposals-vs-projects split) rather than calling
+// projStatus(). "new" maps to "allocated" (assigned, not yet started —
+// that's what "Allocated" already meant there). Mutates in place; call
+// this after any stage-status change, before persisting.
+function syncWorkflowStatus(p) {
+  if (!p || p.workflowStatus === "proposal") return; // don't touch the legacy pre-project state
+  const st = projStatus(p);
+  p.workflowStatus = st === "new" ? "allocated" : st; // "active" | "done" | "allocated"
 }
 function stageIcon(st) {
   const s = st.status || "";
@@ -661,6 +1017,32 @@ function stageCls(st) {
   if (["rejected", "not-received", "not-approved"].includes(s)) return "si-not-approved";
   if (["hold", "comments-shared", "waiting-applicant"].includes(s)) return "si-hold";
   return "si-pending";
+}
+// Colors for the Approval Stage status <select> itself — same semantic
+// buckets as stageCls()/stageIcon() above, packaged as bg/text/border for
+// styling a dropdown rather than a small stepper icon.
+function stageStatusColor(status) {
+  const s = status || "";
+  if (["received", "approved", "completed", "completed-signed", "approved-bcc", "Done"].includes(s))
+    return { bg: "#d4f0e3", color: "#166a3f", border: "#a3d4b8" };
+  if (["under-review", "under-review-meps", "under-review-portal", "submitted", "submitted-meps", "under-preparation", "sent-client-review", "work-in-progress", "inspection-scheduled", "In progress"].includes(s))
+    return { bg: "#e8f0fe", color: "#1a5276", border: "#5b8dee" };
+  if (["rejected", "not-received", "not-approved"].includes(s))
+    return { bg: "#fde8e8", color: "#a32d2d", border: "#e24b4a" };
+  if (["hold", "comments-shared", "waiting-applicant"].includes(s))
+    return { bg: "#ffe8cc", color: "#a04800", border: "#e8a060" };
+  return { bg: "#f0f0f0", color: "#888", border: "#ddd" }; // empty/not selected/Not started
+}
+// Colors for the Document status <select> (Required/Received/Not Received/
+// Correction Required/N/A) — separate palette, matches the same visual
+// language (green=good, red=bad, amber=needs action, grey=neutral).
+function documentStatusColor(status) {
+  const s = status || "";
+  if (s === "received" || s === "done") return { bg: "#d4f0e3", color: "#166a3f", border: "#a3d4b8" };
+  if (s === "not-received") return { bg: "#fde8e8", color: "#a32d2d", border: "#e24b4a" };
+  if (s === "correction") return { bg: "#ffe8cc", color: "#a04800", border: "#e8a060" };
+  if (s === "na") return { bg: "#f0f0f0", color: "#888", border: "#ddd" };
+  return { bg: "#e8f0fe", color: "#1a5276", border: "#5b8dee" }; // required/pending
 }
 
 // ── Data factories ────────────────────────────────────────────
@@ -701,23 +1083,15 @@ function blankDocs() {
     { group: "ADM Completion Inspection", fb: false, items: [{ name: "100% Site Work Completed Photos", status: "pending" }, { name: "Pest Control Documents (Tenant + Company License + Tadweer Agreement) – F&B only", status: "na" }] }
   ];
 }
-function newProj(title) {
-  return {
-    id: makeId(),
-    createdAt: new Date().toISOString().split("T")[0],
-    workflowStatus: "proposal",
-    activityLog: [], proposalLog: [],
-    proposal: { scopeHtml: "", scopeItems: [], estimatedValue: "", expectedStartDate: "", submittedBy: "", submittedAt: "", quotationNumber: "", projectTypes: [], reapprovals: [] },
-    project: { title: title || "New Project", client: "", location: "", unit: "", unitType: [], coordinator: "", consultant: "Winner Holistic Consultants" },
-    stages: blankStages(), docs: blankDocs()
-  };
-}
 function migrateProject(p) {
   if (!p) return p;
   if (!p.workflowStatus) p.workflowStatus = "allocated";
   if (!p.activityLog) p.activityLog = [];
   if (!p.proposalLog) p.proposalLog = [];
-  if (!Array.isArray(p.lpos)) p.lpos = [];   // LPO / milestone payment records
+  // NOTE: p.lpos (legacy) removed — nothing reads it anymore; real
+  // milestone data lives in quotationGroups[].milestones. Existing DB
+  // records may still carry old lpos data; it's simply unused now, not
+  // actively cleared from storage.
   if (!Array.isArray(p.docs)) p.docs = (typeof blankDocs === "function" ? blankDocs() : []);   // Documents tab needs this
   if (!Array.isArray(p.stages)) p.stages = [];
   if (!p.proposal) p.proposal = { scopeHtml: "", estimatedValue: "", expectedStartDate: "", submittedBy: "", submittedAt: "", quotationNumber: "", projectTypes: [], reapprovals: [] };
@@ -734,89 +1108,14 @@ function migrateProject(p) {
   if (p.stages && Array.isArray(p.stages)) {
     p.stages = p.stages.map(st => ({ type: "scope", appNum: "", dateA: "", dateB: "", ...st }));
   }
+  // Self-correct workflowStatus on every load — fixes the "stuck on
+  // allocated forever" bug immediately for display purposes, even before
+  // anyone saves. It'll persist properly the next time the project is saved.
+  if (typeof syncWorkflowStatus === "function") syncWorkflowStatus(p);
   return p;
 }
 
-// ── Scope / quotation helpers ─────────────────────────────────
-const SCOPE_TEMPLATES = {
-  "fnb_kitchen": {
-    label: "F&B with Kitchen Ventilation",
-    items: [
-      { ref: "B.1", title: "ADM Submission Package & Fire/Life Safety Strategy", details: "Preparation of ADM Submission Package including Key Plan, Partition Layout & Section based on Final Architectural Drawings (CAD Files). Preparation of Fire and Life Safety Strategy Layout. Submission to ADM/ADCD and obtain approval.", value: 11000 },
-      { ref: "B.2", title: "Fire Protection System Shop Drawings approval from ADCD", details: "Receipt of Fire Protection (Fire Fighting, Fire Alarm, Emergency, Exit & Fire Suppression System) shop drawings from the Fire Contractor. Completeness check, submission to ADCD, follow-up and obtain approval.", value: 5000 },
-      { ref: "B.3", title: "Kitchen Ventilation System Design Drawings for ADCD Approval", details: "Collection of complete set of Kitchen Ventilation System Drawings & Design Calculation Notes from the Specialist Contractor. Compilation and submission to ADCD for approval.", value: 5000 },
-      { ref: "B.4", title: "Completion Certificate from ADCD", details: "Coordination with Main Contractor & Fire Contractor, collect and compile documents, apply for site inspection and obtain the completion certificate.", value: 500 },
-      { ref: "B.5", title: "Completion Certificate from ADM", details: "Coordination with Main Contractor & Fire Contractor, collect and compile documents, apply for site inspection and obtain the completion certificate.", value: 500 },
-      { ref: "B.6", title: "Scope of the Local Civil Contractor", details: "Pull out the Modification Building Permit from ADM after completion of approval (item B.1). Provide letters, certificates & shop drawing approvals/completion certificates from ADM/ADCD.", value: 3000 }
-    ]
-  },
-  "retail": {
-    label: "Retail (basic)",
-    items: [
-      { ref: "A.1", title: "Project Registration in MePS", details: "Registration of project in MePS portal, submission of required letters and documents.", value: 3000 },
-      { ref: "A.2", title: "Architectural Drawing Approval (ADM & CD-FLS)", details: "Preparation and submission of partition layout, furniture layout, sections and material details.", value: 8000 },
-      { ref: "A.3", title: "TAQA Drawing Approval", details: "Preparation and submission of electrical drawings, SLD and load schedule for TAQA approval.", value: 6000 }
-    ]
-  }
-};
-function blankScopeItem() { return { ref: "", title: "New scope item", details: "", value: 0 }; }
-function scopeSubtotal(items) { return (items || []).reduce((s, i) => s + (Number(i.value) || 0), 0); }
-function scopeVat(items) { return scopeSubtotal(items) * 0.05; }
-function scopeTotal(items) { return scopeSubtotal(items) + scopeVat(items); }
-
 // ── Rich text editor helpers ──────────────────────────────────
-function rteToolbar(targetId) {
-  return `<div class="rte-toolbar">
-    <select class="rte-select" onchange="document.execCommand('formatBlock',false,this.value);this.value='p';document.getElementById('${targetId}').focus()">
-      <option value="p">Paragraph</option><option value="h2">Heading 1</option>
-      <option value="h3">Heading 2</option><option value="h4">Heading 3</option>
-    </select>
-    <select class="rte-select" onchange="document.execCommand('fontSize',false,this.value);document.getElementById('${targetId}').focus()">
-      <option value="">Font Size</option><option value="1">Small</option><option value="3">Normal</option>
-      <option value="4">Large</option><option value="5">X-Large</option>
-    </select>
-    <div class="rte-sep"></div>
-    <button class="rte-btn" title="Bold" onmousedown="event.preventDefault();document.execCommand('bold')"><b>B</b></button>
-    <button class="rte-btn" title="Italic" onmousedown="event.preventDefault();document.execCommand('italic')"><i>I</i></button>
-    <button class="rte-btn" title="Underline" onmousedown="event.preventDefault();document.execCommand('underline')"><u>U</u></button>
-    <div class="rte-sep"></div>
-    <button class="rte-btn" onmousedown="event.preventDefault();document.execCommand('insertUnorderedList')">• List</button>
-    <button class="rte-btn" onmousedown="event.preventDefault();document.execCommand('insertOrderedList')">1. List</button>
-    <div class="rte-sep"></div>
-    <button class="rte-btn" onmousedown="event.preventDefault();document.execCommand('indent')">→</button>
-    <button class="rte-btn" onmousedown="event.preventDefault();document.execCommand('outdent')">←</button>
-    <div class="rte-sep"></div>
-    <button class="rte-btn" onmousedown="event.preventDefault();document.execCommand('justifyLeft')">≡L</button>
-    <button class="rte-btn" onmousedown="event.preventDefault();document.execCommand('justifyCenter')">≡C</button>
-    <button class="rte-btn" onmousedown="event.preventDefault();document.execCommand('justifyRight')">≡R</button>
-    <div class="rte-sep"></div>
-    <button class="rte-btn" title="Insert Table" onmousedown="event.preventDefault();insertRteTable('${targetId}')">⊞ Table</button>
-  </div>
-  <div class="rte-editor" id="${targetId}" contenteditable="true" placeholder="Enter scope of work..."></div>`;
-}
-function insertRteTable(targetId) {
-  const rows = parseInt(prompt("Number of rows:", 3) || 3);
-  const cols = parseInt(prompt("Number of columns:", 3) || 3);
-  if (!rows || !cols) return;
-  let table = "<table>";
-  table += "<tr>" + Array(cols).fill("<th>Header</th>").join("") + "</tr>";
-  for (let r = 1; r < rows; r++) table += "<tr>" + Array(cols).fill("<td>Cell</td>").join("") + "</tr>";
-  table += "</table><p></p>";
-  document.getElementById(targetId)?.focus();
-  document.execCommand("insertHTML", false, table);
-}
-function rteInit(id, html) {
-  setTimeout(() => { const el = document.getElementById(id); if (el && html !== undefined) el.innerHTML = html || ""; }, 60);
-}
-
-// ── Scope item UI ─────────────────────────────────────────────
-function scopeTotalsBlock(items) {
-  return `<div style="margin-top:8px;border-top:1px solid #eee;padding-top:8px;font-size:12px">
-    <div style="display:flex;justify-content:space-between;padding:2px 0;color:#666"><span>Sub-Total</span><span>AED ${fmtMoney(scopeSubtotal(items))}</span></div>
-    <div style="display:flex;justify-content:space-between;padding:2px 0;color:#666"><span>VAT (5%)</span><span>AED ${fmtMoney(scopeVat(items))}</span></div>
-    <div style="display:flex;justify-content:space-between;padding:2px 0;font-weight:700;color:#222"><span>Total incl. VAT</span><span>AED ${fmtMoney(scopeTotal(items))}</span></div>
-  </div>`;
-}
 
 // ── CSV export helper ─────────────────────────────────────────
 function csvEsc(v) {
@@ -876,31 +1175,35 @@ async function openActivityLog(preFilterModule) {
       <div class="actlog-head">
         <div>
           <div class="actlog-title">🕘 Activity Log</div>
-          <div class="actlog-sub">Who created and edited records · Super Admin view</div>
+          <div class="actlog-sub">Structured event log · Super Admin view</div>
         </div>
         <button class="actlog-close" onclick="closeActivityLog()">✕</button>
       </div>
       <div class="actlog-filters">
-        <select id="actlog-module" class="actlog-sel" onchange="renderActivityRows()">
+        <select id="actlog-module" class="actlog-sel" onchange="reloadActivityLog()">
           <option value="all">All Modules</option>
           <option value="Proposals">Proposals</option>
           <option value="Coordinator">Coordinator</option>
           <option value="Account">Account</option>
           <option value="Users">Users</option>
         </select>
-        <input id="actlog-search" class="actlog-search" placeholder="Search name, action, target..."
-          oninput="renderActivityRows()"/>
-        <button class="actlog-refresh" onclick="reloadActivityLog()">↻</button>
+        <input id="actlog-from" class="actlog-date" type="date" value="" onchange="reloadActivityLog()" title="From date (leave blank for no lower limit)"/>
+        <input id="actlog-to" class="actlog-date" type="date" value="" onchange="reloadActivityLog()" title="To date (leave blank for no upper limit)"/>
+        <input id="actlog-search" class="actlog-search" placeholder="search action, actor, target, detail…"
+          oninput="_debounceActivitySearch()"/>
+        <button class="actlog-refresh" onclick="reloadActivityLog()" title="Refresh">↻</button>
         ${(getSession()&&getSession().role==="super_admin")?`
         <select class="actlog-clear" onchange="clearActivityLog(this.value); this.selectedIndex=0;" title="Clear activity log">
           <option value="">🗑 Clear…</option>
-          <option value="30">Older than 30 days</option>
-          <option value="90">Older than 90 days</option>
-          <option value="180">Older than 6 months</option>
-          <option value="365">Older than 1 year</option>
+          <option value="older_30d">Older than 30 days</option>
+          <option value="older_90d">Older than 90 days</option>
+          <option value="older_180d">Older than 6 months</option>
+          <option value="older_365d">Older than 1 year</option>
           <option value="all">Everything</option>
         </select>`:""}
       </div>
+      <div id="actlog-histogram" class="actlog-histogram"></div>
+      <div id="actlog-count" class="actlog-count"></div>
       <div id="actlog-body" class="actlog-body">
         <div class="actlog-loading">Loading activity…</div>
       </div>
@@ -919,23 +1222,49 @@ function closeActivityLog() {
   if (ov) ov.remove();
 }
 
-let _actlogRows = [];
+var _actlogRows = [];
+var _actlogSearchTimer = null;
+function _debounceActivitySearch() {
+  clearTimeout(_actlogSearchTimer);
+  _actlogSearchTimer = setTimeout(reloadActivityLog, 400);
+}
+// Real server-side query — every filter (module, date range, free-text
+// search) is sent to the server and filtered in SQL (see handleLog in
+// data.php), not fetched-then-filtered client-side.
 async function reloadActivityLog() {
   const body = document.getElementById("actlog-body");
   if (body) body.innerHTML = `<div class="actlog-loading">Loading activity…</div>`;
-  _actlogRows = await getActivityLog(null, 500);
-  renderActivityRows();
+  const mod = (document.getElementById("actlog-module")||{}).value || "all";
+  const from = (document.getElementById("actlog-from")||{}).value || "";
+  const to = (document.getElementById("actlog-to")||{}).value || "";
+  const q = ((document.getElementById("actlog-search")||{}).value || "").trim();
+  const extra = {};
+  if (from) extra.from = from + " 00:00:00";
+  if (to) extra.to = to + " 23:59:59";
+  if (q) extra.q = q;
+  try {
+    _actlogRows = await getActivityLog(mod, 500, null, extra);
+    renderActivityRows();
+    renderActlogHistogram();
+  } catch (e) {
+    _actlogRows = [];
+    if (body) body.innerHTML = `<div class="actlog-empty">⚠ Could not load the activity log.<br/><span style="font-size:11px;opacity:0.7">${escAL(e && e.message || "Unknown error")}</span></div>`;
+    const countEl = document.getElementById("actlog-count");
+    if (countEl) countEl.textContent = "Error";
+  }
 }
 
-// Clear activity log — SUPER ADMIN ONLY. mode = "all" or a number of days
-// ("30" deletes entries older than 30 days). Always double-confirms.
+// Clear activity log — SUPER ADMIN ONLY. mode = "all" or "older_Nd". Does
+// a single indexed DELETE server-side now (see handleLog), not a fetch-
+// everything-then-delete-each-row loop.
 async function clearActivityLog(mode) {
   if (!mode) return;
   const u = getSession();
   if (!u || u.role !== "super_admin") { alert("Only Super Admins can clear the activity log."); return; }
 
   const isAll = (mode === "all");
-  const days = parseInt(mode, 10);
+  const m = mode.match(/^older_(\d+)d$/);
+  const days = m ? m[1] : null;
   const label = isAll ? "the ENTIRE activity log" : `all entries older than ${days} days`;
 
   if (!confirm(`Clear ${label}?\n\nThis permanently deletes those records and cannot be undone.`)) return;
@@ -945,74 +1274,96 @@ async function clearActivityLog(mode) {
   if (body) body.innerHTML = `<div class="actlog-loading">Clearing…</div>`;
 
   try {
-    if (isAll) {
-      const ok = await fbDelete("activity_log");
-      if (!ok) throw new Error("delete failed");
-      try { await logActivity("Users", "Cleared activity log (all)", "", u.name || ""); } catch (e) {}
-    } else {
-      // Fetch everything, find entries older than the cutoff, delete each.
-      const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-      const all = await fbGet("activity_log", { fresh: true }) || {};
-      const oldKeys = Object.keys(all).filter(k => {
-        const at = all[k] && all[k].at ? Date.parse(all[k].at) : NaN;
-        return !isNaN(at) && at < cutoff;
-      });
-      if (!oldKeys.length) {
-        if (body) body.innerHTML = `<div class="actlog-empty">No entries older than ${days} days.</div>`;
-        setTimeout(reloadActivityLog, 1200);
-        return;
-      }
-      // Delete in batches to avoid hammering the connection.
-      for (let i = 0; i < oldKeys.length; i += 25) {
-        await Promise.all(oldKeys.slice(i, i + 25).map(k => fbDelete("activity_log/" + k)));
-      }
-      try { await logActivity("Users", `Cleared activity log (older than ${days}d)`, `${oldKeys.length} entries`, u.name || ""); } catch (e) {}
-    }
+    // Same reasoning as getActivityLog() above — no coPath(), since writes
+    // never used it either.
+    const ok = await _dataCall("delete", "activity_log", { mode });
+    if (!ok) throw new Error("delete failed");
+    try { await logActivity("Users", isAll ? "Cleared activity log (all)" : `Cleared activity log (older than ${days}d)`, "", u.name || ""); } catch (e) {}
     await reloadActivityLog();
   } catch (e) {
     if (body) body.innerHTML = `<div class="actlog-empty">Could not clear the log. Please try again.</div>`;
   }
 }
 
+// Splunk-style dense structured event rows: [time] MODULE actor » action —
+// target · detail, in a monospace-leaning layout so scanning many rows at
+// once is fast and each field is clearly separated instead of prose text.
+// Splunk-style event timeline — a row of bars showing event density over
+// time, computed from whatever's currently loaded. Auto-picks hour vs day
+// buckets depending on how wide a span the current rows actually cover.
+function renderActlogHistogram() {
+  const el = document.getElementById("actlog-histogram");
+  if (!el) return;
+  if (!_actlogRows.length) { el.innerHTML = ""; return; }
+  const times = _actlogRows.map(r => new Date(r.at).getTime()).filter(t => !isNaN(t));
+  if (!times.length) { el.innerHTML = ""; return; }
+  const min = Math.min(...times), max = Math.max(...times);
+  const spanMs = Math.max(1, max - min);
+  const useHourly = spanMs < 36 * 3600 * 1000; // under ~1.5 days → hourly buckets, else daily
+  const bucketMs = useHourly ? 3600 * 1000 : 86400 * 1000;
+  const bucketCount = Math.min(48, Math.max(6, Math.ceil(spanMs / bucketMs) + 1));
+  const buckets = new Array(bucketCount).fill(0);
+  times.forEach(t => {
+    const idx = Math.min(bucketCount - 1, Math.floor((t - min) / bucketMs));
+    buckets[idx]++;
+  });
+  const peak = Math.max(...buckets, 1);
+  el.innerHTML = `<div class="actlog-hist-bars">
+    ${buckets.map((c, i) => {
+      const h = Math.max(2, Math.round((c / peak) * 26));
+      const bucketStart = new Date(min + i * bucketMs);
+      const label = useHourly ? bucketStart.toLocaleTimeString([], { hour: "2-digit" }) : bucketStart.toLocaleDateString([], { month: "short", day: "numeric" });
+      return `<div class="actlog-hist-bar" style="height:${h}px" title="${label}: ${c} event${c===1?"":"s"}"></div>`;
+    }).join("")}
+  </div>`;
+}
+
 function renderActivityRows() {
   const body = document.getElementById("actlog-body");
+  const countEl = document.getElementById("actlog-count");
   if (!body) return;
-  const mod = (document.getElementById("actlog-module")||{}).value || "all";
-  const q = ((document.getElementById("actlog-search")||{}).value || "").toLowerCase().trim();
   const moduleColors = { Proposals:"#9b59b6", Coordinator:"#27ae60", Account:"#5b8dee", Users:"#e8a060" };
 
-  let rows = _actlogRows.slice();
-  if (mod !== "all") rows = rows.filter(r => r.module === mod);
-  if (q) rows = rows.filter(r =>
-    (r.by||"").toLowerCase().includes(q) ||
-    (r.action||"").toLowerCase().includes(q) ||
-    (r.target||"").toLowerCase().includes(q) ||
-    (r.module||"").toLowerCase().includes(q)
-  );
-
-  if (!rows.length) {
-    body.innerHTML = `<div class="actlog-empty">No activity matches.</div>`;
+  if (countEl) countEl.textContent = `${_actlogRows.length} event${_actlogRows.length===1?"":"s"}`;
+  if (!_actlogRows.length) {
+    body.innerHTML = `<div class="actlog-empty">No events match this filter.</div>`;
     return;
   }
-  body.innerHTML = rows.map(r => {
+  body.innerHTML = _actlogRows.map((r,i) => {
     const col = moduleColors[r.module] || "#888";
-    const isEdit = /edit/i.test(r.action);
-    return `<div class="actlog-row">
-      <div class="actlog-dot" style="background:${col}"></div>
-      <div class="actlog-main">
-        <div class="actlog-line">
-          <b>${escAL(r.action||"")}</b>${r.target?` — ${escAL(r.target)}`:""}
-          ${isEdit?`<span class="actlog-tag actlog-tag-edit">edited</span>`:""}
-        </div>
-        <div class="actlog-meta">
-          <span class="actlog-modpill" style="background:${col}22;color:${col}">${escAL(r.module||"")}</span>
-          by <b>${escAL(r.by||"—")}</b>${r.role?` (${escAL(r.role)})`:""}
-          ${r.detail?` · ${escAL(r.detail)}`:""}
-        </div>
-      </div>
-      <div class="actlog-time">${fmtDateTime(r.at)}</div>
-    </div>`;
+    const isEdit = /edit|modif|updat/i.test(r.action || "");
+    const isDelete = /delet|remov|clear/i.test(r.action || "");
+    const isCreate = /creat|add|raise/i.test(r.action || "");
+    const kind = isDelete ? "del" : isEdit ? "edit" : isCreate ? "new" : "";
+    const hasChanges = Array.isArray(r.changes) && r.changes.length > 0;
+    const expandable = hasChanges || r.projectId || r.by;
+    return `<div class="actlog-ev${expandable?' actlog-ev-expandable':''}" ${expandable?`onclick="_toggleActlogDetail(${i})"`:''}>
+      <span class="actlog-ev-time">${escAL(fmtLogTime(r.at))}</span>
+      <span class="actlog-ev-mod" style="background:${col}22;color:${col}">${escAL(r.module||"—")}</span>
+      <span class="actlog-ev-actor" title="${escAL(r.by||"")}${r.role?' · '+escAL(r.role):''}">${escAL(r.byName||r.by||"—")}</span>
+      <span class="actlog-ev-arrow">»</span>
+      <span class="actlog-ev-action ${kind?'actlog-ev-'+kind:''}">${escAL(r.action||"")}</span>
+      ${r.target?`<span class="actlog-ev-target">${escAL(r.target)}</span>`:""}
+      ${r.detail?`<span class="actlog-ev-detail">${escAL(r.detail)}</span>`:""}
+      ${expandable?`<span class="actlog-ev-chevron" id="actlog-chev-${i}">▸</span>`:""}
+    </div>
+    ${expandable?`<div class="actlog-ev-expand" id="actlog-detail-${i}" style="display:none">
+      <div class="actlog-kv"><span class="actlog-k">Timestamp</span><span class="actlog-v">${escAL(r.at||"")}</span></div>
+      ${r.by?`<div class="actlog-kv"><span class="actlog-k">Actor</span><span class="actlog-v">${escAL(r.byName||"")}${r.by?` &lt;${escAL(r.by)}&gt;`:""}${r.role?` · ${escAL(r.role)}`:""}</span></div>`:""}
+      ${r.projectId?`<div class="actlog-kv"><span class="actlog-k">Project ID</span><span class="actlog-v">${escAL(r.projectId)}</span></div>`:""}
+      ${hasChanges?`<div class="actlog-kv" style="align-items:flex-start"><span class="actlog-k">Changes</span><span class="actlog-v">
+        ${r.changes.map(c => `<div class="actlog-diff-row"><b>${escAL(c.field||c.label||"")}</b>: <span class="actlog-diff-old">${escAL(c.from!=null?String(c.from):"—")}</span> → <span class="actlog-diff-new">${escAL(c.to!=null?String(c.to):"—")}</span></div>`).join("")}
+      </span></div>`:""}
+    </div>` : ""}`;
   }).join("");
+}
+function _toggleActlogDetail(i) {
+  const el = document.getElementById("actlog-detail-" + i);
+  const chev = document.getElementById("actlog-chev-" + i);
+  if (!el) return;
+  const open = el.style.display !== "none";
+  el.style.display = open ? "none" : "block";
+  if (chev) chev.textContent = open ? "▸" : "▾";
 }
 
 // Local escape (independent of module's esc())
@@ -1025,29 +1376,54 @@ function injectActivityLogStyles() {
   css.textContent = `
   #whc-actlog-overlay{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;font-family:'DM Sans',system-ui,sans-serif}
   .actlog-backdrop{position:absolute;inset:0;background:rgba(15,13,40,0.6);backdrop-filter:blur(3px)}
-  .actlog-panel{position:relative;width:min(680px,94vw);max-height:88vh;display:flex;flex-direction:column;background:#2e3560;border:1px solid #474f86;border-radius:16px;box-shadow:0 24px 60px rgba(10,8,30,0.6);overflow:hidden}
+  .actlog-panel{position:relative;width:min(1500px,95vw);max-height:90vh;display:flex;flex-direction:column;background:#1c2036;border:1px solid #363c63;border-radius:16px;box-shadow:0 24px 60px rgba(10,8,30,0.6);overflow:hidden}
   .actlog-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:18px 20px;background:linear-gradient(135deg,#272c54,#3a4275);border-bottom:1px solid #474f86}
   .actlog-title{font-size:17px;font-weight:700;color:#fff}
   .actlog-sub{font-size:11px;color:#b9c0e6;margin-top:2px}
   .actlog-close{background:rgba(255,255,255,0.12);color:#fff;border:none;border-radius:8px;width:30px;height:30px;font-size:14px;cursor:pointer}
   .actlog-close:hover{background:rgba(255,255,255,0.22)}
-  .actlog-filters{display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid #474f86;background:#272c54}
-  .actlog-sel,.actlog-search{background:#3a4275;color:#eef0fb;border:1px solid #474f86;border-radius:8px;padding:8px 10px;font-size:12px;font-family:inherit}
-  .actlog-search{flex:1}
-  .actlog-sel:focus,.actlog-search:focus{outline:none;border-color:#e3c468}
+  .actlog-filters{display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid #363c63;background:#20244a;flex-wrap:wrap}
+  .actlog-sel,.actlog-search,.actlog-date{background:#2c3157;color:#eef0fb;border:1px solid #474f86;border-radius:8px;padding:8px 10px;font-size:12px;font-family:inherit}
+  .actlog-search{flex:1;min-width:160px}
+  .actlog-date{color-scheme:dark;width:132px}
+  .actlog-sel:focus,.actlog-search:focus,.actlog-date:focus{outline:none;border-color:#e3c468}
   .actlog-refresh{background:#e3c468;color:#272c54;border:none;border-radius:8px;width:36px;font-size:14px;font-weight:700;cursor:pointer}
-  .actlog-body{overflow-y:auto;padding:6px 10px 14px}
+  .actlog-histogram{padding:10px 16px 6px;background:#181b30;border-bottom:1px solid #363c63}
+  .actlog-hist-bars{display:flex;align-items:flex-end;gap:2px;height:28px}
+  .actlog-hist-bar{flex:1;background:linear-gradient(180deg,#7c5cff,#5b3df5);border-radius:2px 2px 0 0;min-width:2px;transition:opacity 0.1s}
+  .actlog-hist-bar:hover{opacity:0.7}
+  .actlog-count{padding:6px 16px;font-size:10.5px;color:#7d84ad;background:#181b30;border-bottom:1px solid #363c63;font-family:'SF Mono',Consolas,Menlo,monospace}
+  .actlog-body{overflow-y:auto;padding:2px 0}
   .actlog-loading,.actlog-empty{padding:40px;text-align:center;color:#8b93c4;font-size:13px}
-  .actlog-row{display:flex;gap:11px;align-items:flex-start;padding:11px 10px;border-bottom:1px solid #3a4275}
-  .actlog-row:last-child{border-bottom:none}
-  .actlog-dot{width:9px;height:9px;border-radius:50%;margin-top:5px;flex-shrink:0}
-  .actlog-main{flex:1;min-width:0}
-  .actlog-line{font-size:13px;color:#eef0fb}
-  .actlog-meta{font-size:11px;color:#b9c0e6;margin-top:3px}
-  .actlog-modpill{padding:1px 7px;border-radius:7px;font-weight:600;margin-right:3px}
-  .actlog-tag{font-size:9px;font-weight:700;padding:1px 6px;border-radius:6px;margin-left:6px;vertical-align:middle}
-  .actlog-tag-edit{background:#3a4275;color:#e3c468}
-  .actlog-time{font-size:10.5px;color:#8b93c4;white-space:nowrap;flex-shrink:0;margin-top:2px}
+  /* Dense, structured event row — timestamp / module / actor / action /
+     target / detail all visually separated in one line (wraps on mobile),
+     monospace timestamp for that log-viewer feel, alternating row shade
+     for scanability across many rows at once. */
+  .actlog-ev{display:flex;align-items:baseline;gap:8px;padding:6px 16px;font-size:12px;color:#c9cee8;border-bottom:1px solid #22263f;flex-wrap:wrap}
+  .actlog-ev:nth-child(odd){background:#20244022}
+  .actlog-ev:hover{background:#272c4c}
+  .actlog-ev-time{font-family:'SF Mono',Consolas,Menlo,monospace;font-size:10.5px;color:#6b73a0;flex-shrink:0;width:118px}
+  .actlog-ev-mod{font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:5px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.3px}
+  .actlog-ev-actor{font-weight:600;color:#eef0fb;flex-shrink:0;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .actlog-ev-arrow{color:#4c5389;flex-shrink:0}
+  .actlog-ev-action{color:#d8dcf5}
+  .actlog-ev-new{color:#7ee0a8}
+  .actlog-ev-edit{color:#f0c869}
+  .actlog-ev-del{color:#f08080}
+  .actlog-ev-target{color:#9ba3d6;font-weight:600}
+  .actlog-ev-target::before{content:"— "}
+  .actlog-ev-detail{color:#7d84ad;flex-basis:100%;padding-left:126px;font-size:11px}
+  @media(max-width:640px){ .actlog-ev-detail{padding-left:0} .actlog-ev-time{width:auto} }
+  .actlog-ev-expandable{cursor:pointer}
+  .actlog-ev-chevron{color:#5b628f;font-size:10px;margin-left:auto;flex-shrink:0;transition:transform 0.1s}
+  .actlog-ev-expand{background:#161a30;border-bottom:1px solid #2a2f52;padding:10px 16px 12px 126px;font-family:'SF Mono',Consolas,Menlo,monospace;font-size:11px}
+  .actlog-kv{display:flex;gap:10px;margin-bottom:4px;line-height:1.5}
+  .actlog-k{color:#5b628f;flex-shrink:0;width:78px;text-transform:uppercase;font-size:9.5px;font-weight:700;letter-spacing:0.4px;padding-top:2px}
+  .actlog-v{color:#c7cbef;word-break:break-word}
+  .actlog-diff-row{color:#c7cbef;padding:2px 0}
+  .actlog-diff-old{color:#f08080;text-decoration:line-through;opacity:0.8}
+  .actlog-diff-new{color:#7ee0a8;font-weight:600}
+  @media(max-width:640px){ .actlog-ev-expand{padding-left:16px} }
   `;
   document.head.appendChild(css);
 }
@@ -1056,21 +1432,6 @@ function injectActivityLogStyles() {
 // ── Lightweight project diff for the global activity log ──────
 // Projects are nested; this reports which top-level sections changed
 // plus the stage count delta, e.g. "Changed: project details, stages (+2)".
-function diffProjectSummary(prev, next) {
-  if (!prev) return "";
-  const parts = [];
-  try {
-    if (JSON.stringify(prev.project||{}) !== JSON.stringify(next.project||{})) parts.push("project details");
-    const ps = (prev.stages||[]).length, ns = (next.stages||[]).length;
-    if (JSON.stringify(prev.stages||[]) !== JSON.stringify(next.stages||[])) {
-      const delta = ns - ps;
-      parts.push("stages" + (delta!==0 ? ` (${delta>0?"+":""}${delta})` : ""));
-    }
-    if (JSON.stringify(prev.milestones||{}) !== JSON.stringify(next.milestones||{})) parts.push("milestones");
-    if ((prev.coordinator||"") !== (next.coordinator||"")) parts.push("coordinator assignment");
-  } catch(e) {}
-  return parts.length ? "Changed: " + parts.join(", ") : "Minor update";
-}
 
 // ── Deep field-by-field diff for the detailed audit log ───────
 // Produces a flat list of { field, from, to } for every changed leaf value,
@@ -1127,30 +1488,11 @@ function deepDiff(prev, next, base, out, seen) {
 
 // ============================================================
 //  LPO / Milestone helpers (shared across modules)
-//  A project carries p.lpos = [ {lpo}, ... ]. Each LPO:
-//    { id, name, amount, dateRaised, raisedBy, raisedByRole,
-//      invoiceNo, status:"pending"|"credited", creditedDate,
-//      paymentRef, createdAt }
-//  Project value = sum of all LPO amounts ("raised over time").
+//  Real milestone data lives in quotationGroups[].milestones (see
+//  _buildQuotationGroup / accountStatus / milestoneAmount). The legacy
+//  p.lpos array this section used to document is gone — nothing reads
+//  or writes it anymore.
 // ============================================================
-function blankLPO(seedName) {
-  const who = (typeof currentActor === "function") ? currentActor() : { name:"", role:"" };
-  return {
-    id: "lpo_" + Date.now() + "_" + Math.random().toString(36).slice(2,6),
-    name: seedName || "",
-    amount: 0,
-    dateRaised: new Date().toISOString().slice(0,10),
-    raisedBy: who.name || "",
-    raisedByRole: who.role || "",
-    invoiceNo: "",
-    status: "pending",
-    owner: "",                 // account user responsible for crediting
-    creditedDate: "",
-    creditedBy: "",
-    paymentRef: "",
-    createdAt: new Date().toISOString()
-  };
-}
 
 function lpoTotals(lpos) {
   const list = Array.isArray(lpos) ? lpos : [];
@@ -1164,6 +1506,100 @@ function lpoTotals(lpos) {
   return { raised, credited, pending, count, creditedCount };
 }
 
+// A milestone's stageStatus is set to "Raise Invoice" by Coordinator once
+// work is complete, signaling Account to invoice/credit it. Older records
+// saved before this rename still say "Done" — treat both as equivalent so
+// existing data keeps working without a migration step.
+function isMilestoneRaised(status) {
+  return status === "Raise Invoice" || status === "Done";
+}
+
+// ── Two SEPARATE status tracks (not one collapsed status) ──────
+//
+// Coordinator sets stageStatus:  Open | In progress | Raise Invoice
+//   (stored value stays "Not started" for the Open state, for backward
+//   compatibility with existing data — only the DISPLAY label changed.)
+//
+// Account sets status: Open | Invoice Pending | Invoice Raised | Credited
+//   ("Credited" is stored lowercase "credited", matching the many existing
+//   checks for that value across the app.)
+//
+// Link between them: when Coordinator sets stageStatus to "Raise Invoice",
+// Account's status auto-advances from Open to "Invoice Pending" (only if it
+// hadn't already been moved further along) — see _setGroupMilestoneStatus
+// in coordinator.js. That's what puts it in Account's Awaiting list.
+
+function coordStatusLabel(stageStatus) {
+  if (isMilestoneRaised(stageStatus)) return "Raise Invoice";
+  if (stageStatus === "In progress") return "In progress";
+  return "Open";
+}
+var COORD_STATUS_STYLE = {
+  "Open":          { bg: "#eef0f3", color: "#777",   icon: "" },
+  "In progress":   { bg: "#eef4ff", color: "#1a3a5c", icon: "●" },
+  "Raise Invoice": { bg: "#fdf3df", color: "#a06b00", icon: "⏳" },
+};
+
+// Normalize Account's status, inferring a sensible value for OLDER records
+// that predate this 4-state model (they only ever had "pending"/"credited").
+function accountStatus(m) {
+  if (!m) return "Open";
+  const raw = m.status;
+  if (raw === "credited" || raw === "Credited") return "Credited";
+  if (raw === "Invoice Raised") return "Invoice Raised";
+  if (raw === "Invoice Pending") return "Invoice Pending";
+  if (raw === "Open") return "Open";
+  // Legacy value ("pending") or missing: infer from whether Coordinator
+  // has raised it — that's the closest equivalent under the old model.
+  return isMilestoneRaised(m.stageStatus) ? "Invoice Pending" : "Open";
+}
+var ACCOUNT_STATUS_STYLE = {
+  "Open":            { bg: "#eef0f3", color: "#777",    icon: "" },
+  "Invoice Pending":  { bg: "#fdf3df", color: "#a06b00",  icon: "⏳" },
+  "Invoice Raised":   { bg: "#eef4ff", color: "#1a3a5c",  icon: "📨" },
+  "Credited":         { bg: "#e3f6ee", color: "#166a3f",  icon: "✓" },
+};
+// Awaiting Account's action = raised by Coordinator (or already being
+// worked) but not yet credited.
+function isAwaitingAccount(m) {
+  const st = accountStatus(m);
+  return st === "Invoice Pending" || st === "Invoice Raised";
+}
+// ── Milestone amount (single source of truth) ───────────────────
+// Regular payment milestones are a % of the quotation group's contract
+// total. Government Fees Invoice and Completed Scope Payment rows are
+// DIFFERENT — Coordinator enters a direct actual amount for each (the
+// govt fee in the quotation is only an estimate; completed-scope payment
+// has no % of anything to derive from), so those always use
+// m.actualAmount instead of the pct×total formula.
+function isFixedAmountRow(m) {
+  return !!(m && (m.isGovtFee || m.isCompletedScopePayment));
+}
+function milestoneAmount(m, groupTotal) {
+  if (!m) return 0;
+  if (isFixedAmountRow(m)) return Number(m.actualAmount) || 0;
+  return groupTotal ? Math.round(groupTotal * (Number(m.pct) || 0) / 100) : (Number(m.amount) || 0);
+}
+// A project is on Hold or Cancelled — a manual override set by Coordinator/
+// Team Lead/Super Admin, independent of the auto-computed workflowStatus
+// (new/active/done). See coordinator.js setProjectHoldStatus().
+function isProjectOnHold(p) {
+  return !!(p && (p.holdStatus === "hold" || p.holdStatus === "cancelled"));
+}
+// Attention = sitting in Invoice Pending or Invoice Raised for more than
+// 10 days without progressing to Credited. Relies on m.statusSince, set
+// whenever the status actually changes (see coordinator.js
+// _setGroupMilestoneStatus / _setGroupMilestonePayStatus). Milestones from
+// before that tracking existed have no statusSince — treated as NOT
+// overdue rather than guessed, since there's no reliable date to judge by.
+function isMilestoneAttention(m) {
+  if (!isAwaitingAccount(m) || !m.statusSince) return false;
+  const since = new Date(m.statusSince);
+  if (isNaN(since.getTime())) return false;
+  const days = (Date.now() - since.getTime()) / 86400000;
+  return days > 10;
+}
+
 function fmtAED(n) {
   const v = Number(n) || 0;
   return "AED " + v.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -1174,21 +1610,22 @@ function fmtAED(n) {
 //  Injected by each module via mountSidebar(active). Nav items are
 //  role-filtered. Content (#app) is shifted right via CSS (.has-sidebar).
 // ============================================================
-const SIDEBAR_ITEMS = [
-  { key:"proposals",   url:"/proposals/",   icon:"📝", label:"Proposals",   roles:["proposals","super_admin"] },
-  { key:"coordinator", url:"/coordinator/", icon:"📋", label:"Coordinator", roles:["coordinator","super_admin","proposals"] },
-  { key:"account",     url:"/account/",     icon:"⚙️", label:"Account",     roles:["super_admin","account"] },
-  { key:"payments",    url:"/payments/",    icon:"📊", label:"Milestone Dashboard",  roles:["super_admin","account","proposals","coordinator"] },
-  { key:"summary",     url:"/summary/",     icon:"📊", label:"Summary",     roles:["super_admin","proposals","account"] },
+// Role arrays come from MODULE_ACCESS in shared/permissions.js (single
+// source of truth) — the sidebar just adds labels/icons/URLs.
+var SIDEBAR_ITEMS = [
+  { key:"proposals",   url:"/proposals/",   icon:"📝", label:"Proposals",   roles: MODULE_ACCESS.proposals },
+  { key:"coordinator", url:"/coordinator/", icon:"📋", label:"Coordinator", roles: MODULE_ACCESS.coordinator },
+  { key:"templates",   url:"/templates/",   icon:"🧩", label:"Templates",   roles: MODULE_ACCESS.templates },
+  { key:"account",     url:"/account/",     icon:"⚙️", label:"Account",     roles: MODULE_ACCESS.account },
+  { key:"payments",    url:"/payments/",    icon:"📊", label:"Milestone",  roles: MODULE_ACCESS.payments },
+  { key:"summary",     url:"/summary/",     icon:"📊", label:"Overall Summary",     roles: MODULE_ACCESS.summary },
+  { key:"team_performance", url:"/team-performance/", icon:"🏆", label:"Team Performance", roles: MODULE_ACCESS.team_performance },
 ];
 
 // Roles that may only VIEW (not edit) a given module. Used by the
 // pages to render in read-only mode. Super admin is never restricted.
-const VIEW_ONLY_ROLES = {
-  summary:     ["proposals", "account"],                   // Overall Summary: view only
-  payments:    ["proposals", "coordinator", "account"],    // LPO Summary: view only
-  coordinator: ["proposals"],                              // Proposal sees Coordinator read-only
-};
+// VIEW_ONLY_ROLES now lives in shared/permissions.js (single source of
+// truth), loaded before this file on every page.
 function isViewOnly(moduleKey, role) {
   if (role === "super_admin") return false;
   const list = VIEW_ONLY_ROLES[moduleKey] || [];
@@ -1245,13 +1682,89 @@ function applyViewOnlyMode(moduleLabel) {
   mo.observe(document.body, { childList: true, subtree: true });
 }
 
+// ============================================================
+//  Theme preferences: dark/light, accent color, density
+//  Stored in localStorage (per-browser), applied as data-* attributes
+//  on <html> so the whole CSS variable system (see style.css :root)
+//  picks it up automatically. Also applied via a tiny inline snippet at
+//  the very top of every page's <head> (before the stylesheet loads) to
+//  avoid a flash of the wrong theme on load — this function is what
+//  re-applies it after full page scripts are available (e.g. for the
+//  picker UI itself), not the very first paint.
+// ============================================================
+var THEME_ACCENTS = [
+  { id: "default",   label: "Blueprint (default)", swatch: "linear-gradient(135deg,#2d6a9e,#0f3355)", swatchDark: "linear-gradient(135deg,#4a90c9,#1a3a5c)" },
+  { id: "slate",      label: "Slate",           swatch: "linear-gradient(135deg,#7b8998,#3d4a5c)", swatchDark: "linear-gradient(135deg,#9aa8b8,#5b6b7d)" },
+  { id: "concrete",   label: "Concrete",        swatch: "linear-gradient(135deg,#a39990,#5c5249)", swatchDark: "linear-gradient(135deg,#c4b8ac,#83776c)" },
+  { id: "steel",      label: "Steel",           swatch: "linear-gradient(135deg,#6b8299,#374856)", swatchDark: "linear-gradient(135deg,#8aa0b8,#4f6478)" },
+  { id: "classic",    label: "Classic Navy & Gold", swatch: "linear-gradient(135deg,#c9a752,#4c1d95)", swatchDark: "linear-gradient(135deg,#e0bd6e,#6d28d9)" },
+];
+function getThemePrefs() {
+  let theme = "light", accent = "default", density = "comfortable";
+  try {
+    theme = localStorage.getItem("whc_theme") || "light";
+    accent = localStorage.getItem("whc_accent") || "default";
+    density = localStorage.getItem("whc_density") || "comfortable";
+  } catch (e) {}
+  return { theme, accent, density };
+}
+function applyThemePrefs() {
+  const p = getThemePrefs();
+  const html = document.documentElement;
+  if (p.theme === "dark") html.setAttribute("data-theme", "dark"); else html.removeAttribute("data-theme");
+  if (p.accent && p.accent !== "default") html.setAttribute("data-accent", p.accent); else html.removeAttribute("data-accent");
+  if (p.density === "compact") html.setAttribute("data-density", "compact"); else html.removeAttribute("data-density");
+}
+function setThemePref(key, value) {
+  try { localStorage.setItem("whc_" + key, value); } catch (e) {}
+  applyThemePrefs();
+  renderThemePanel();
+}
+
+function toggleThemePanel() {
+  const el = document.getElementById("whc-theme-panel");
+  if (!el) return;
+  const open = el.style.display !== "none";
+  el.style.display = open ? "none" : "block";
+}
+function renderThemePanel() {
+  const el = document.getElementById("whc-theme-panel");
+  if (!el) return;
+  const p = getThemePrefs();
+  el.innerHTML = `
+    <div style="font-size:11px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;opacity:0.85">Appearance</div>
+
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <button type="button" onclick="setThemePref('theme','light')" style="flex:1;padding:7px 0;border-radius:8px;border:1.5px solid ${p.theme==='light'?'#fff':'rgba(255,255,255,0.25)'};background:${p.theme==='light'?'rgba(255,255,255,0.18)':'transparent'};color:#fff;font-size:11px;font-weight:600;cursor:pointer">☀️ Light</button>
+      <button type="button" onclick="setThemePref('theme','dark')" style="flex:1;padding:7px 0;border-radius:8px;border:1.5px solid ${p.theme==='dark'?'#fff':'rgba(255,255,255,0.25)'};background:${p.theme==='dark'?'rgba(255,255,255,0.18)':'transparent'};color:#fff;font-size:11px;font-weight:600;cursor:pointer">🌙 Dark</button>
+    </div>
+
+    <div style="font-size:10px;color:rgba(255,255,255,0.65);margin-bottom:6px;font-weight:600">Accent color</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:12px">
+      ${THEME_ACCENTS.map(a => `<div onclick="setThemePref('accent','${a.id}')" title="${esc(a.label)}"
+        style="cursor:pointer;text-align:center">
+        <div style="width:100%;height:26px;border-radius:8px;background:${p.theme==='dark'?a.swatchDark:a.swatch};border:2px solid ${p.accent===a.id?'#fff':'transparent'};box-shadow:${p.accent===a.id?'0 0 0 2px rgba(255,255,255,0.3)':'none'}"></div>
+      </div>`).join("")}
+    </div>
+
+    <div style="font-size:10px;color:rgba(255,255,255,0.65);margin-bottom:6px;font-weight:600">Density</div>
+    <div style="display:flex;gap:6px">
+      <button type="button" onclick="setThemePref('density','comfortable')" style="flex:1;padding:7px 0;border-radius:8px;border:1.5px solid ${p.density==='comfortable'?'#fff':'rgba(255,255,255,0.25)'};background:${p.density==='comfortable'?'rgba(255,255,255,0.18)':'transparent'};color:#fff;font-size:11px;font-weight:600;cursor:pointer">Comfortable</button>
+      <button type="button" onclick="setThemePref('density','compact')" style="flex:1;padding:7px 0;border-radius:8px;border:1.5px solid ${p.density==='compact'?'#fff':'rgba(255,255,255,0.25)'};background:${p.density==='compact'?'rgba(255,255,255,0.18)':'transparent'};color:#fff;font-size:11px;font-weight:600;cursor:pointer">Compact</button>
+    </div>`;
+}
+
 function mountSidebar(activeKey) {
   if (document.getElementById("whc-sidebar")) return; // once
   const u = getSession() || {};
   const role = u.role || "";
   const items = SIDEBAR_ITEMS.filter(it => it.roles.includes(role));
 
-  const nav = items.map(it => `
+  const homeLink = `
+    <a href="/auth/" class="sb-link ${activeKey==="home"?"on":""}">
+      <span class="sb-ico">🏠</span><span class="sb-label">Home</span>
+    </a>`;
+  const nav = homeLink + items.map(it => `
     <a href="${it.url}" class="sb-link ${it.key===activeKey?"on":""}">
       <span class="sb-ico">${it.icon}</span><span class="sb-label">${it.label}</span>
     </a>`).join("");
@@ -1270,6 +1783,8 @@ function mountSidebar(activeKey) {
     </div>
     <div class="sb-nav">${nav}</div>
     <div class="sb-foot">
+      <div id="whc-theme-panel" style="display:none;background:rgba(0,0,0,0.18);border-radius:12px;padding:12px;margin-bottom:10px"></div>
+      <button type="button" onclick="toggleThemePanel()" style="width:100%;padding:8px;margin-bottom:8px;border:1.5px solid rgba(255,255,255,0.25);border-radius:9px;background:rgba(255,255,255,0.1);color:#fff;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">🎨 Appearance</button>
       <div class="sb-user">
         <div class="sb-user-avatar">${esc((u.name||"U").charAt(0).toUpperCase())}</div>
         <div class="sb-user-info">
@@ -1280,6 +1795,8 @@ function mountSidebar(activeKey) {
       <button class="sb-logout" onclick="serverLogout().then(()=>window.location.href='/auth/')">Logout</button>
     </div>`;
   document.body.appendChild(el);
+  applyThemePrefs();
+  renderThemePanel();
 
   // Mobile toggle button
   const tog = document.createElement("button");
@@ -1324,16 +1841,6 @@ function applyViewMode(mode) {
     ? "🖥 Desktop view"
     : "📱 Mobile view";
 }
-function setViewMode(mode) {
-  try { localStorage.setItem("whc_view_mode", mode); } catch(e){}
-  applyViewMode(mode);
-  // Re-render if the module exposes render()/renderSummaryPage() etc.
-  if (typeof render === "function") { try { render(); } catch(e){} }
-}
-function toggleViewMode() {
-  const now = document.body.classList.contains("mobile-view") ? "mobile" : "desktop";
-  setViewMode(now === "mobile" ? "desktop" : "mobile");
-}
 function mountViewToggle() {
   // No manual toggle button. Phones auto-detect into the responsive
   // single-column layout, but everything stays fully editable.
@@ -1374,12 +1881,12 @@ function svgIcon(name, size, color) {
 //  holds the Microsoft credentials. Here we just send the file and
 //  store the returned link on the record.
 // ============================================================
-const ATTACH_ENDPOINT = "/api/onedrive-upload.php";
-const ATTACH_MAX = 4 * 1024 * 1024;
-const ATTACH_TYPES = ["pdf","png","jpg","jpeg","gif","webp","heic","bmp","tif","tiff"];
+var ATTACH_ENDPOINT = "/api/onedrive-upload.php";
+var ATTACH_MAX = 4 * 1024 * 1024;
+var ATTACH_TYPES = ["pdf","png","jpg","jpeg","gif","webp","heic","bmp","tif","tiff"];
 // Turn this ON after the Azure + Netlify OneDrive setup is done.
 // While false, the upload box shows a "coming soon" note instead of erroring.
-const ATTACH_ENABLED = false;
+var ATTACH_ENABLED = false;
 
 function _fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -1559,7 +2066,7 @@ async function _handleAttach(inputEl, recordType, recordId, onChangeFnName) {
 // the same folder number, starts in Open state, and is saved to the Proposals
 // list so the Proposals team can fill in its full details. Returns the new
 // quotation's number (or "" on failure).
-const _CATEGORY_PATH = {
+var _CATEGORY_PATH = {
   "Fitout Folder": "quotations/fitout",
   "Live Folder":   "quotations/live",
   "ID Folder":     "quotations/id",
@@ -1567,19 +2074,47 @@ const _CATEGORY_PATH = {
 };
 // Numbering config (mirrors QTN_CONFIG in proposals-quotation.js) so the
 // coordinator page can mint the next number without loading that file.
-const _QTN_NUM_CONFIG = {
-  "Fitout Folder": { pattern: (s,y)=>`${s}-${y}`,        counterKey:"qtn_counter/fitout",  startSeq:1709 },
-  "Live Folder":   { pattern: (s,y)=>`W-L-${s}-${y}-R0`, counterKey:"qtn_counter/live",    startSeq:747 },
-  "ID Folder":     { pattern: (s,y)=>`W-ID-${s}-${y}`,   counterKey:"qtn_counter/id",      startSeq:108 },
-  "Private Folder":{ pattern: (s,y)=>`W-P-${s}-${y}`,    counterKey:"qtn_counter/private", startSeq:316 }
+// ── Quotation number format (single source of truth) ───────────
+// Q-<Company>-<Category>-<Seq>-<Year>-R<Revision>
+//   Company:  W = Winner Holistic Consultant, M = Moonway, S = WH Safety & Fire
+//             (derived from the active company — see getCompany() above)
+//   Category: F = Fitout, L = Live, ID = ID, P = Private
+//   Seq:      a running number — auto-suggested from the counter below, but
+//             fully editable by Super Admin / Proposals in the quotation
+//             form, so it can be set to continue an existing numbering.
+//   Year:     2-digit year
+//   Revision: R0 = original quotation; a raised revision bumps this to
+//             R1, R2… on the SAME base number rather than taking a new one
+//             (see mintRevisionQuotation below).
+var QTN_CATEGORY_CODE = { "Fitout Folder": "F", "Live Folder": "L", "ID Folder": "ID", "Private Folder": "P" };
+var QTN_COMPANY_LETTER = { whc: "W", mw: "M", whsf: "S" };
+function qtnCompanyLetter() {
+  const id = (typeof getCompany === "function") ? getCompany().id : "whc";
+  return QTN_COMPANY_LETTER[id] || "W";
+}
+function qtnBuildNumber(category, seq, yr) {
+  const cat = QTN_CATEGORY_CODE[category] || "X";
+  return `Q-${qtnCompanyLetter()}-${cat}-${seq}-${yr}-R0`;
+}
+// NOTE: R0/R1/R2 is Proposals' OWN revision-column tracking within a single
+// quotation's Scope & Fees table (freezing a column when "+ Add Revision"
+// is used, then editing the next one) — it has nothing to do with
+// Coordinator's revision REQUEST flow below, which always mints a fresh,
+// distinct quotation number (see mintRevisionQuotation) since a Coordinator-
+// raised request is for re-approval / additional scope, not a price
+// revision of the existing quotation.
+
+var _QTN_NUM_CONFIG = {
+  "Fitout Folder":  { pattern: (s,y)=>qtnBuildNumber("Fitout Folder", s, y),  counterKey:"qtn_counter/fitout",  startSeq:1709 },
+  "Live Folder":    { pattern: (s,y)=>qtnBuildNumber("Live Folder", s, y),    counterKey:"qtn_counter/live",    startSeq:747 },
+  "ID Folder":      { pattern: (s,y)=>qtnBuildNumber("ID Folder", s, y),      counterKey:"qtn_counter/id",      startSeq:108 },
+  "Private Folder": { pattern: (s,y)=>qtnBuildNumber("Private Folder", s, y),counterKey:"qtn_counter/private", startSeq:316 }
 };
 async function _nextQtnNumber(category) {
   const cfg = _QTN_NUM_CONFIG[category] || _QTN_NUM_CONFIG["Fitout Folder"];
   const yr = String(new Date().getFullYear()).slice(-2);
-  const counter = await fbGet(coPath(cfg.counterKey));
-  const seq = counter ? (counter.seq || cfg.startSeq) : cfg.startSeq;
-  await fbSet(coPath(cfg.counterKey), { seq: seq + 1, updatedAt: new Date().toISOString() });
-  return cfg.pattern(seq, yr);
+  const seq = await fbIncrement(coPath(cfg.counterKey), cfg.startSeq);
+  return cfg.pattern(seq != null ? seq : cfg.startSeq, yr);
 }
 // Build the standard project display name: "<folder>_<projectName>"
 // (e.g. "1278_Alguir"). Safe against blanks and avoids double-prefixing if
@@ -1654,6 +2189,13 @@ async function mintRevisionQuotation(project, req) {
   try {
     const category = (project.category) || (project.proposal && project.proposal.category) || "Fitout Folder";
     const path = _CATEGORY_PATH[category] || "quotations/fitout";
+    // A Coordinator-raised revision request is for RE-APPROVAL / additional
+    // scope — a genuinely separate quotation, not a revision of the pricing
+    // on the existing one. It always gets its own fresh, distinct quotation
+    // number from the normal counter. (R0/R1/R2 is a different thing
+    // entirely — that's Proposals' own revision-column tracking WITHIN one
+    // quotation's Scope & Fees table, e.g. when re-editing and resubmitting
+    // the same quotation. This function never touches that.)
     const qtnNo = await _nextQtnNumber(category);
     const folder = (project.folderPath) || (project.proposal && project.proposal.folderName) || project.id || "";
     const id = "qtn_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
@@ -1671,6 +2213,7 @@ async function mintRevisionQuotation(project, req) {
       qtn_number: qtnNo,
       proj_name: cleanName || storedTitle || "",
       client_name: (project.project && project.project.client) || "",
+      location: (project.project && project.project.location) || "",
       folder_ref: folder,
       folderPath: folder,
       open_status: "Open",
@@ -1681,11 +2224,15 @@ async function mintRevisionQuotation(project, req) {
       rev_reason: req.reason || "",
       scope: req.scope || "",
       raisedBy: who.email || who.name || "",
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      // Project-level details a revision always inherits (never re-typed):
+      // client, location and Project Type all live on the project record,
+      // not per-quotation, so copy them straight through.
+      project: { unitType: Array.isArray(project.project && project.project.unitType) ? project.project.unitType.slice() : [] }
     };
     await fbSet(coPath(path + "/" + id), rec);
-    return qtnNo;
-  } catch (e) { return ""; }
+    return { qtnNo, id };
+  } catch (e) { return { qtnNo: "", id: "" }; }
 }
 
 // ============================================================
@@ -1693,7 +2240,7 @@ async function mintRevisionQuotation(project, req) {
 // Scope and milestones are a coupled set belonging to this quotation.
 function _buildQuotationGroup(quotation, pj, value, who, nowIso) {
   const scope = (pj.scope || []).map(s => ({
-    name: s.name || "", value: Number(s.value) || 0,
+    name: s.name || "", desc: s.desc || "", code: s.code || "", value: Number(s.value) || 0,
     rev: Array.isArray(s.rev) ? s.rev.slice() : [Number(s.value) || 0]
   }));
   const govtFees = (pj.govtFees || []).map(g => ({
@@ -1706,21 +2253,47 @@ function _buildQuotationGroup(quotation, pj, value, who, nowIso) {
   }));
   // Compute totals from the CURRENT revision column so revisions reflect
   // correctly. value/amount already carry the current-revision figure.
+  // Scope and Sub-Contractor Fees each get their own 5% VAT; Govt Fees carry
+  // no VAT. Total incl. VAT = full amount invoiced to client. Net Amount
+  // (WHC) = what WHC retains after Sub-Contractor + Govt Fees pass through.
   const subtotal = scope.reduce((a, s) => a + (s.value || 0), 0);
   const vat = Math.round(subtotal * 0.05);
+  const scopeInclVat = subtotal + vat;
   const govtTotal = govtFees.reduce((a, g) => a + (g.amount || 0), 0);
   const subTotalFees = subFees.reduce((a, s) => a + (s.amount || 0), 0);
-  const contractTotal = subtotal + vat + subTotalFees + govtTotal;
+  const subVat = Math.round(subTotalFees * 0.05);
+  const subInclVat = subTotalFees + subVat;
+  const contractTotal = scopeInclVat + subInclVat + govtTotal;
+  const netAmount = scopeInclVat - subInclVat - govtTotal;
   const milestones = (pj.lpo || []).map((m, idx) => ({
     id: "ms_" + (quotation.id || "q") + "_" + idx,
     name: m.name || ("Milestone " + (idx + 1)),
     pct: Number(m.pct) || 0,
     amount: Number(m.value) || Math.round(contractTotal * (Number(m.pct) || 0) / 100),
-    stageStatus: "Not started",     // Not started / In progress / Done
+    stageStatus: "Not started",     // Not started / In progress / Raise Invoice (older records may still say "Done" — isMilestoneRaised() treats both the same)
     status: "pending",              // pending / credited (Account)
     owner: "", invoiceNo: "", creditedDate: "", paymentRef: "",
     createdAt: nowIso
   }));
+  // Government Fees Invoice is mandatory, not optional — auto-added to the
+  // SAME milestone list whenever the quotation carries govt fees, so it
+  // follows the exact same workflow as every other milestone rather than
+  // being a separate thing Coordinator has to remember to add. The
+  // quotation's govt fee figure is only an estimate; the actual amount is
+  // entered by Coordinator when actually raising the invoice (see
+  // isFixedAmountRow / milestoneAmount in this file).
+  if (govtTotal > 0) {
+    milestones.push({
+      id: "govtfee_" + (quotation.id || "q"),
+      name: "Government Fees Invoice",
+      isGovtFee: true,
+      estimatedAmount: govtTotal,
+      actualAmount: 0, remarks: "", pct: 0,
+      stageStatus: "Not started", status: "Open",
+      owner: "", invoiceNo: "", creditedDate: "", paymentRef: "",
+      createdAt: nowIso
+    });
+  }
   return {
     id: "grp_" + (quotation.id || Date.now()),
     quotationNo: quotation.qtn_number || "",
@@ -1729,22 +2302,44 @@ function _buildQuotationGroup(quotation, pj, value, who, nowIso) {
     parentQuotation: quotation.parent_quotation || "",
     scope, govtFees, subFees, milestones,
     scopeFrozen: pj.scopeFrozen || 0,
-    subtotal, vat, govtTotal, subTotal: subTotalFees, contractTotal,
+    subtotal, vat, govtTotal, subTotal: subTotalFees, subVat, contractTotal, netAmount,
     scopeFile: pj.scopeFile || null,
+    subFile: pj.subFile || null,
     lpoFile: pj.lpoFile || null,
     createdAt: nowIso,
     createdBy: (who && who.name) || ""
   };
 }
 
+// The deterministic project id for a given quotation — same formula used
+// everywhere a quotation needs to be associated with its project, so a
+// quotation's activity log entries can always be tagged correctly even
+// before the project record itself exists yet (the id is derivable from
+// the quotation alone, doesn't require the project to already exist).
+function deriveProjectIdForQuotation(q) {
+  if (!q) return "";
+  return (q.is_revision && q.parent_project_id)
+    ? q.parent_project_id
+    : "proj_" + (q.id || ("q_" + Date.now()));
+}
+
 async function ensureProjectFromQuotation(quotation, category) {
   if (!quotation) return;
-  // Awarded = Won AND LPO received. Both required before a project is created.
+  // Awarded = Won AND email confirmation received. (LPO Received is
+  // tracked separately and no longer gates this — see collectProjectDetails/
+  // _isAwardedNow in proposals-quotation.js, which this must match or a
+  // quotation can pass the "awarded" check there but silently fail to
+  // create/update its project here.)
   const won = (quotation.open_status || "").toLowerCase() === "won";
-  const lpoReceived = (quotation.lpo_received || "").toUpperCase() === "Y";
-  if (!(won && lpoReceived)) return;
+  const emailOk = (quotation.email_confirm || "").toUpperCase() === "Y";
+  if (!(won && emailOk)) return;
 
-  const projId = "proj_" + (quotation.id || ("q_" + Date.now()));
+  // A revision quotation carries parent_project_id (set by mintRevisionQuotation)
+  // pointing at the ORIGINAL project. Resolve to that same project so revisions
+  // add a new quotation tab under it instead of spawning a duplicate project
+  // with the same name. Only a brand-new (non-revision) quotation mints a
+  // fresh project id from its own quotation id.
+  const projId = deriveProjectIdForQuotation(quotation);
   const path = coPath("projects/" + projId);
 
   // Load any existing project so we don't clobber coordinator work.
@@ -1774,6 +2369,7 @@ async function ensureProjectFromQuotation(quotation, category) {
       createdBy: who.name || "",
       folderPath: pj.folderPath || "",
       scopeFile: pj.scopeFile || null,
+      subFile: pj.subFile || null,
       lpoFile: pj.lpoFile || null,
       project: {
         title: _combineFolderName(pj.folderPath, quotation.proj_name) || quotation.qtn_number || "Untitled Project",
@@ -1781,7 +2377,7 @@ async function ensureProjectFromQuotation(quotation, category) {
         location: quotation.location || "",
         unit: "",
         coordinator: "",          // assigned later by super admin / coordinator
-        unitType: []
+        unitType: Array.isArray(pj.unitType) ? pj.unitType.slice() : []
       },
       proposal: {
         quotationNumber: quotation.qtn_number || "",
@@ -1820,6 +2416,7 @@ async function ensureProjectFromQuotation(quotation, category) {
       if (combinedTitle) patch["project/title"] = combinedTitle;
     }
     if (!(existing.project && existing.project.client)) patch["project/client"] = quotation.client_name || "";
+    patch["project/unitType"] = Array.isArray(pj.unitType) ? pj.unitType.slice() : [];
 
     // ── Merge scope stages ──
     // Keep non-awarded_scope stages untouched; rebuild the awarded_scope set
@@ -1829,15 +2426,34 @@ async function ensureProjectFromQuotation(quotation, category) {
     existingStages.filter(s => s.type === "awarded_scope").forEach(s => { statusByName[(s.name||"").trim().toLowerCase()] = s; });
 
     // ── Upsert this quotation's GROUP ──
-    // Find the group for this quotation (by quotationId); update it in place
-    // (preserving milestone status/credit/owner), or add a new group (revision).
+    // Find the group for this quotation (by quotationId, or quotationNo as
+    // a fallback); update it in place (preserving milestone status/credit/
+    // owner), or add a new group (revision). Both checks require a truthy
+    // value on BOTH sides before comparing — without that guard, a group
+    // with an empty/missing quotationId could wrongly match a submission
+    // whose id also wasn't set yet, silently overwriting an unrelated
+    // group's milestones with a different quotation's data.
     const groups = Array.isArray(existing.quotationGroups) ? existing.quotationGroups.slice() : [];
-    const gi = groups.findIndex(g => g.quotationId === (quotation.id || "") || (g.quotationNo && g.quotationNo === quotation.qtn_number));
+    const qId = quotation.id || "";
+    const gi = groups.findIndex(g =>
+      (g.quotationId && qId && g.quotationId === qId) ||
+      (g.quotationNo && quotation.qtn_number && g.quotationNo === quotation.qtn_number)
+    );
     const fresh = _buildQuotationGroup(quotation, pj, value, who, nowIso);
     if (gi >= 0) {
-      // Preserve coordinator/account fields on milestones matched by name.
+      // Preserve coordinator/account fields on milestones matched by name —
+      // this now includes the Government Fees Invoice row too, since it's
+      // auto-regenerated by _buildQuotationGroup on every resubmission with
+      // a fresh estimate, but Coordinator's entered actual amount/remarks/
+      // status must carry forward. Completed Scope Payment is different —
+      // it's purely manual/ad-hoc (Proposals never sources or rebuilds it),
+      // so it's carried forward wholesale instead of name-matched.
       const prevMs = {};
-      (groups[gi].milestones || []).forEach(m => { prevMs[(m.name||"").trim().toLowerCase()] = m; });
+      const prevSpecialRows = [];
+      (groups[gi].milestones || []).forEach(m => {
+        if (m.isCompletedScopePayment) prevSpecialRows.push(m);
+        else prevMs[(m.name||"").trim().toLowerCase()] = m;
+      });
       fresh.id = groups[gi].id;
       fresh.milestones = fresh.milestones.map(m => {
         const prev = prevMs[(m.name||"").trim().toLowerCase()];
@@ -1845,9 +2461,13 @@ async function ensureProjectFromQuotation(quotation, category) {
           stageStatus: prev.stageStatus || m.stageStatus,
           status: prev.status || m.status,
           owner: prev.owner || "", invoiceNo: prev.invoiceNo || "",
-          creditedDate: prev.creditedDate || "", paymentRef: prev.paymentRef || ""
+          creditedDate: prev.creditedDate || "", paymentRef: prev.paymentRef || "",
+          // actualAmount/remarks only exist on the Govt Fees row — harmless
+          // no-op for regular milestones (prev.actualAmount is undefined).
+          actualAmount: prev.actualAmount != null ? prev.actualAmount : m.actualAmount,
+          remarks: prev.remarks || m.remarks
         }) : m;
-      });
+      }).concat(prevSpecialRows);
       groups[gi] = fresh;
     } else {
       groups.push(fresh);   // new quotation (e.g. approved revision) = new group

@@ -14,6 +14,6 @@ return [
     'host'    => 'localhost',
     'name'    => 'projects_db',      // e.g. hazrkhk3b2ip_whc
     'user'    => 'project_db',      // e.g. hazrkhk3b2ip_whcuser
-    'pass'    => 'Win_holi@2026',
+    'pass'    => 'DB pass',
     'charset' => 'utf8mb4',
 ];

@@ -3,10 +3,23 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<script>
+// Apply saved theme/accent/density BEFORE the stylesheet paints, so there's
+// no flash of the wrong theme on load. Deliberately tiny and dependency-free
+// (shared.js hasn't loaded yet) — mirrors applyThemePrefs() in shared.js.
+(function(){
+  try{
+    var t=localStorage.getItem("whc_theme"), a=localStorage.getItem("whc_accent"), d=localStorage.getItem("whc_density");
+    if(t==="dark") document.documentElement.setAttribute("data-theme","dark");
+    if(a && a!=="default") document.documentElement.setAttribute("data-accent",a);
+    if(d==="compact") document.documentElement.setAttribute("data-density","compact");
+  }catch(e){}
+})();
+</script>
 <title>WHC – Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Poppins:wght@500;600;700&display=swap"/>
-<link rel="stylesheet" href="../shared/style.css"/>
+<link rel="stylesheet" href="../shared/style.css?v=20260714i"/>
 <button class="scroll-top-btn" id="scrollTopBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></button>
 </head>
 <body>
@@ -18,10 +31,11 @@
 </style>
 <div id="app"><div class="loading"><div class="spinner"></div><div style="font-size:13px;color:#888">Loading...</div></div></div>
 
-<script src="../shared/config.js?v=20260705k"></script>
-<script src="../shared/shared.js?v=20260705k"></script>
-<script src="../coordinator/coordinator.js"></script>
-<script src="account.js?v=20260705k"></script>
+<script src="../shared/config.js?v=20260714i"></script>
+<script src="../shared/permissions.js?v=20260714i"></script>
+<script src="../shared/shared.js?v=20260714i"></script>
+<script src="../coordinator/coordinator.js?v=20260714i"></script>
+<script src="account.js?v=20260714i"></script>
 <script>
 let ALL_PROJECTS = {}, PROJ = null, CURRENT_USER = null, ACCOUNT_USERS = [], COORDINATOR_USERS = [], PROPOSAL_USERS = [];
 let S = {
@@ -34,10 +48,13 @@ let S = {
 };
 
 async function boot() {
-  CURRENT_USER = requireRole("super_admin","account");
+  CURRENT_USER = requireModule("account");
   if (!CURRENT_USER) return;
+  await loadRbacOverrides();
+  window.WHC_VIEW_ONLY = isViewOnly("account", CURRENT_USER.role);
   S.coordName = CURRENT_USER.name || "Admin";
   mountSidebar("account");
+  if (window.WHC_VIEW_ONLY) applyViewOnlyMode("Account");
   mountViewToggle();
   try { ACCOUNT_USERS = await fetchUsersByRole("account"); } catch (e) { ACCOUNT_USERS = []; }
   try { COORDINATOR_USERS = await fetchUsersByRole("coordinator"); } catch (e) { COORDINATOR_USERS = []; }

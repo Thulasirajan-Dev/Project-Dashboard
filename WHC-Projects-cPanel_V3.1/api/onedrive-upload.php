@@ -13,6 +13,7 @@
 // ============================================================
 
 $cfg = require __DIR__ . '/config.secret.php';
+require __DIR__ . '/db/conn.php';
 
 $TENANT  = $cfg['AZURE_TENANT_ID']     ?? '';
 $CLIENT  = $cfg['AZURE_CLIENT_ID']     ?? '';
@@ -34,6 +35,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
 // ---- Require a valid login session ----
 // Uses our private Azure/OneDrive credentials — never callable anonymously.
+// Match the server-side session lifetime to the 120-minute client-side
+// idle timeout (see shared.js SESSION_IDLE_MS) — otherwise PHP's default
+// session.gc_maxlifetime (often ~24 min on shared hosts) could silently
+// expire the session server-side well before the client thinks it should.
+ini_set('session.gc_maxlifetime', 7200);
 session_set_cookie_params([
     'lifetime' => 0, 'path' => '/', 'secure' => ($cfg['COOKIE_SECURE'] ?? true),
     'httponly' => true, 'samesite' => 'Strict',
@@ -44,6 +50,13 @@ if (empty($_SESSION['uid'])) {
     http_response_code(401);
     header('Content-Type: application/json');
     echo json_encode(['error' => 'Not authenticated']);
+    exit;
+}
+if (!session_still_current($_SESSION['uid'], $_SESSION['stoken'] ?? '')) {
+    session_kill();
+    http_response_code(401);
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'This account signed in on another device/browser. You have been signed out here.']);
     exit;
 }
 

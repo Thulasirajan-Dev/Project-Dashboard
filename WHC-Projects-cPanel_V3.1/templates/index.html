@@ -16,12 +16,11 @@
   }catch(e){}
 })();
 </script>
-<title>WHC – Overall Summary</title>
+<title>WHC – Templates</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Poppins:wght@500;600;700&display=swap"/>
 <link rel="stylesheet" href="../shared/style.css?v=20260714i"/>
 <button class="scroll-top-btn" id="scrollTopBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></button>
-
 </head>
 <body>
 <!-- Back to Portal (floating) -->
@@ -34,18 +33,18 @@
 <script src="../shared/config.js?v=20260714i"></script>
 <script src="../shared/permissions.js?v=20260714i"></script>
 <script src="../shared/shared.js?v=20260714i"></script>
-<script src="summary-dashboard.js?v=20260714i"></script>
+<script src="templates.js?v=20260714i"></script>
 <script>
-let S = { summaryYear:new Date().getFullYear(), _summaryData:null, lpoFrom:"", lpoTo:"" };
+let S = { tplTab: "scope", search: "", expanded: {}, _tplEdit: null };
 async function boot() {
-  const user = requireModule("summary");
-  if (!user) return;
+  CURRENT_USER = requireModule("templates");
+  if (!CURRENT_USER) return;
   await loadRbacOverrides();
-  window.WHC_VIEW_ONLY = isViewOnly("summary", user.role);
-  mountSidebar("summary");
-  if (window.WHC_VIEW_ONLY) applyViewOnlyMode("Overall Summary");
+  window.WHC_VIEW_ONLY = isViewOnly("templates", CURRENT_USER.role);
+  mountSidebar("templates");
+  if (window.WHC_VIEW_ONLY) applyViewOnlyMode("Templates");
   mountViewToggle();
-  await loadAndRenderSummary();
+  await loadAndRenderTemplates();
 }
 boot();
 </script>
